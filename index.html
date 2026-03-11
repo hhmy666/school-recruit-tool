@@ -1,0 +1,1754 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>校招管理工具</title>
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: #f0f4f8; min-height: 100vh; }
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+/* Sidebar */
+.sidebar { width: 240px; background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%); color: white; height: 100vh; position: fixed; left: 0; top: 0; z-index: 50; transition: transform 0.3s ease; }
+.sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 40; }
+.nav-item { display: flex; align-items: center; gap: 12px; padding: 12px 20px; cursor: pointer; transition: all 0.2s; border-radius: 8px; margin: 4px 12px; font-size: 14px; }
+.nav-item:hover { background: rgba(255,255,255,0.1); }
+.nav-item.active { background: linear-gradient(135deg, #3b82f6, #2563eb); box-shadow: 0 4px 12px rgba(59,130,246,0.4); }
+.main-content { margin-left: 240px; padding: 24px; min-height: 100vh; }
+/* Cards */
+.card { background: white; border-radius: 16px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; }
+/* Calendar */
+.cal-day { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 8px; font-size: 13px; cursor: pointer; transition: all 0.2s; }
+.cal-day.checked { background: #22c55e; color: white; font-weight: 600; }
+.cal-day.missed { background: #e2e8f0; color: #94a3b8; }
+.cal-day.makeup { background: #eab308; color: white; font-weight: 600; }
+.cal-day.today { border: 2px solid #3b82f6; }
+.cal-day.rest-day { background: #fef3c7; color: #92400e; }
+/* Buttons */
+.btn-primary { background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; border: none; padding: 10px 20px; border-radius: 10px; cursor: pointer; font-weight: 500; transition: all 0.2s; font-size: 14px; }
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(59,130,246,0.4); }
+.btn-secondary { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; padding: 10px 20px; border-radius: 10px; cursor: pointer; font-weight: 500; transition: all 0.2s; font-size: 14px; }
+.btn-secondary:hover { background: #e2e8f0; }
+.btn-danger { background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+.btn-danger:hover { background: #fecaca; }
+/* Input */
+.input-field { width: 100%; padding: 10px 14px; border: 1px solid #e2e8f0; border-radius: 10px; font-size: 14px; transition: all 0.2s; background: #f8fafc; }
+.input-field:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); background: white; }
+textarea.input-field { resize: vertical; min-height: 80px; }
+/* Select */
+select.input-field { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23475569' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
+/* Status badges */
+.badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+.badge-submitted { background: #dbeafe; color: #1d4ed8; }
+.badge-pen-wait { background: #fef3c7; color: #92400e; }
+.badge-pen-done { background: #d1fae5; color: #065f46; }
+.badge-interview-wait { background: #ede9fe; color: #5b21b6; }
+.badge-interview-done { background: #d1fae5; color: #065f46; }
+.badge-resume-fail { background: #fee2e2; color: #dc2626; }
+.badge-pen-fail { background: #fee2e2; color: #dc2626; }
+.badge-interview-fail { background: #fee2e2; color: #dc2626; }
+.badge-give-up { background: #f1f5f9; color: #64748b; }
+/* Modal */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+.modal-overlay.show { opacity: 1; pointer-events: auto; }
+.modal-content { background: white; border-radius: 20px; padding: 32px; max-width: 600px; width: 90%; max-height: 85vh; overflow-y: auto; transform: scale(0.9); transition: transform 0.3s; }
+.modal-overlay.show .modal-content { transform: scale(1); }
+/* Toast */
+.toast { position: fixed; top: 20px; right: 20px; padding: 14px 24px; border-radius: 12px; color: white; font-size: 14px; font-weight: 500; z-index: 200; transform: translateX(120%); transition: transform 0.3s; box-shadow: 0 8px 24px rgba(0,0,0,0.15); }
+.toast.show { transform: translateX(0); }
+.toast-success { background: linear-gradient(135deg, #22c55e, #16a34a); }
+.toast-error { background: linear-gradient(135deg, #ef4444, #dc2626); }
+.toast-warning { background: linear-gradient(135deg, #f59e0b, #d97706); }
+/* Checkin animation */
+@keyframes checkPulse { 0% { transform: scale(1); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
+.check-anim { animation: checkPulse 0.5s ease; }
+/* Tab styles */
+.tab-btn { padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s; border: none; background: transparent; color: #64748b; }
+.tab-btn.active { background: #3b82f6; color: white; }
+/* Checkbox custom */
+.custom-check { width: 20px; height: 20px; border: 2px solid #cbd5e1; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0; }
+.custom-check.checked { background: #22c55e; border-color: #22c55e; }
+/* Responsive */
+@media (max-width: 768px) {
+  .sidebar { transform: translateX(-100%); }
+  .sidebar.open { transform: translateX(0); }
+  .sidebar-overlay.show { display: block; }
+  .main-content { margin-left: 0; padding: 16px; padding-top: 70px; }
+  .mobile-header { display: flex !important; }
+}
+@media (min-width: 769px) {
+  .mobile-header { display: none !important; }
+}
+/* Prompt output */
+.prompt-box { background: #1e293b; color: #e2e8f0; padding: 20px; border-radius: 12px; font-family: monospace; font-size: 13px; white-space: pre-wrap; word-break: break-all; max-height: 400px; overflow-y: auto; line-height: 1.8; }
+</style>
+</head>
+<body>
+
+<!-- Toast -->
+<div id="toast" class="toast"></div>
+
+<!-- Mobile Header -->
+<div class="mobile-header fixed top-0 left-0 right-0 bg-white shadow-sm z-30 px-4 py-3 flex items-center justify-between" style="display:none;">
+  <button onclick="toggleSidebar()" class="p-2 rounded-lg hover:bg-gray-100">
+    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+  </button>
+  <span class="font-semibold text-gray-800" id="mobileTitle">校招管理工具</span>
+  <div class="w-8"></div>
+</div>
+
+<!-- Sidebar Overlay -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+<!-- Sidebar -->
+<div class="sidebar" id="sidebar">
+  <div class="p-6 pb-4">
+    <div class="flex items-center gap-3 mb-1">
+      <div class="w-10 h-10 rounded-xl bg-blue-500 flex items-center justify-center text-lg">🎓</div>
+      <div>
+        <h1 class="text-lg font-bold">校招管家</h1>
+        <p class="text-xs text-slate-400">Campus Recruit</p>
+      </div>
+    </div>
+  </div>
+  <div class="px-3 mb-4">
+    <div class="bg-slate-700/50 rounded-xl p-3 flex items-center gap-3">
+      <div class="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center text-sm">👤</div>
+      <div class="min-w-0 flex-1">
+        <p class="text-sm font-medium truncate" id="sidebarUser">未登录</p>
+        <p class="text-xs text-slate-400">在线</p>
+      </div>
+    </div>
+  </div>
+  <nav class="flex-1 py-2" id="navMenu">
+    <div class="nav-item active" data-page="checkin" onclick="switchPage('checkin')">
+      <span>📋</span><span>每日打卡</span>
+    </div>
+    <div class="nav-item" data-page="delivery" onclick="switchPage('delivery')">
+      <span>📮</span><span>投递管理</span>
+    </div>
+    <div class="nav-item" data-page="interview" onclick="switchPage('interview')">
+      <span>💼</span><span>面试管理</span>
+    </div>
+    <div class="nav-item" data-page="settings" onclick="switchPage('settings')">
+      <span>⚙️</span><span>设置</span>
+    </div>
+    <div class="nav-item" data-page="account" onclick="switchPage('account')">
+      <span>👤</span><span>账号管理</span>
+    </div>
+  </nav>
+  <div class="p-4">
+    <button onclick="logout()" class="w-full py-2 rounded-lg bg-red-500/10 text-red-400 text-sm hover:bg-red-500/20 transition cursor-pointer">退出登录</button>
+  </div>
+</div>
+
+<!-- Auth Page -->
+<div id="authPage" class="min-h-screen flex items-center justify-center p-4" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+  <div class="card w-full max-w-md p-8">
+    <div class="text-center mb-8">
+      <div class="text-5xl mb-4">🎓</div>
+      <h1 class="text-2xl font-bold text-gray-800">校招管家</h1>
+      <p class="text-gray-500 text-sm mt-1">Campus Recruitment Manager</p>
+    </div>
+    <div class="flex bg-gray-100 rounded-xl p-1 mb-6">
+      <button class="flex-1 py-2 rounded-lg text-sm font-medium transition cursor-pointer bg-white shadow text-gray-800" id="authLoginTab" onclick="switchAuthTab('login')">登录</button>
+      <button class="flex-1 py-2 rounded-lg text-sm font-medium transition cursor-pointer text-gray-500" id="authRegTab" onclick="switchAuthTab('register')">注册</button>
+    </div>
+    <!-- Login -->
+    <div id="loginForm">
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1">用户名</label>
+        <input type="text" id="loginUser" class="input-field" placeholder="请输入用户名" autocomplete="username">
+      </div>
+      <div class="mb-6">
+        <label class="block text-sm font-medium text-gray-700 mb-1">密码</label>
+        <input type="password" id="loginPass" class="input-field" placeholder="请输入密码" autocomplete="current-password">
+      </div>
+      <button onclick="doLogin()" class="btn-primary w-full py-3">登 录</button>
+    </div>
+    <!-- Register -->
+    <div id="registerForm" style="display:none;">
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1">用户名</label>
+        <input type="text" id="regUser" class="input-field" placeholder="请输入用户名（至少3位）" autocomplete="username">
+      </div>
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1">密码</label>
+        <input type="password" id="regPass" class="input-field" placeholder="请输入密码（至少6位）" autocomplete="new-password">
+      </div>
+      <div class="mb-6">
+        <label class="block text-sm font-medium text-gray-700 mb-1">确认密码</label>
+        <input type="password" id="regPass2" class="input-field" placeholder="请再次输入密码" autocomplete="new-password">
+      </div>
+      <button onclick="doRegister()" class="btn-primary w-full py-3">注 册</button>
+    </div>
+  </div>
+</div>
+
+<!-- Main App -->
+<div id="appPage" style="display:none;">
+  <!-- Page: Checkin -->
+  <div class="main-content page-content" id="page-checkin">
+    <div class="max-w-4xl mx-auto">
+      <h2 class="text-2xl font-bold text-gray-800 mb-6">📋 每日打卡</h2>
+      
+      <!-- Today's Tasks -->
+      <div class="card mb-6">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-semibold text-gray-800 text-lg">今日任务 <span class="text-sm text-gray-400" id="todayDateLabel"></span></h3>
+          <span class="text-sm text-gray-400" id="todayDayLabel"></span>
+        </div>
+        <div id="todayRestDay" style="display:none;" class="text-center py-8">
+          <div class="text-4xl mb-3">😴</div>
+          <p class="text-gray-500">今天是休息日，好好休息吧！</p>
+          <p class="text-sm text-gray-400 mt-1">当然你也可以选择打卡</p>
+          <button onclick="forceCheckinToday()" class="btn-secondary mt-4">我要打卡</button>
+        </div>
+        <div id="todayTasks"></div>
+        <div id="todayCheckinArea" class="mt-4"></div>
+      </div>
+
+      <!-- Checkin Calendar -->
+      <div class="card">
+        <div class="flex items-center justify-between mb-4">
+          <button onclick="changeCalMonth(-1)" class="btn-secondary px-3 py-1 text-sm cursor-pointer">◀</button>
+          <h3 class="font-semibold text-gray-800" id="calMonthLabel"></h3>
+          <button onclick="changeCalMonth(1)" class="btn-secondary px-3 py-1 text-sm cursor-pointer">▶</button>
+        </div>
+        <div class="grid grid-cols-7 gap-1 text-center mb-2">
+          <div class="text-xs text-gray-400 py-1">日</div>
+          <div class="text-xs text-gray-400 py-1">一</div>
+          <div class="text-xs text-gray-400 py-1">二</div>
+          <div class="text-xs text-gray-400 py-1">三</div>
+          <div class="text-xs text-gray-400 py-1">四</div>
+          <div class="text-xs text-gray-400 py-1">五</div>
+          <div class="text-xs text-gray-400 py-1">六</div>
+        </div>
+        <div class="grid grid-cols-7 gap-1" id="calendarGrid"></div>
+        <div class="flex items-center gap-6 mt-4 text-xs text-gray-500">
+          <div class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-green-500 inline-block"></span> 已打卡</div>
+          <div class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-yellow-500 inline-block"></span> 补打卡</div>
+          <div class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-gray-200 inline-block"></span> 未打卡</div>
+          <div class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-amber-100 inline-block border border-amber-300"></span> 休息日</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Page: Delivery -->
+  <div class="main-content page-content" id="page-delivery" style="display:none;">
+    <div class="max-w-5xl mx-auto">
+      <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+        <h2 class="text-2xl font-bold text-gray-800">📮 投递管理</h2>
+        <button onclick="showAddDelivery()" class="btn-primary">+ 新增投递</button>
+      </div>
+      <!-- Filters -->
+      <div class="card mb-4 p-3">
+        <div class="flex items-center gap-3 flex-wrap">
+          <input type="text" id="deliverySearch" class="input-field max-w-xs" placeholder="搜索公司名称..." oninput="renderDeliveries()">
+          <select id="deliveryFilter" class="input-field max-w-[160px]" onchange="renderDeliveries()">
+            <option value="">全部状态</option>
+            <option value="已投递">已投递</option>
+            <option value="待笔试">待笔试</option>
+            <option value="已笔试">已笔试</option>
+            <option value="待面试">待面试</option>
+            <option value="已面试">已面试</option>
+            <option value="简历挂">简历挂</option>
+            <option value="笔试挂">笔试挂</option>
+            <option value="面试挂">面试挂</option>
+            <option value="放弃">放弃</option>
+          </select>
+        </div>
+      </div>
+      <div id="deliveryList"></div>
+    </div>
+  </div>
+
+  <!-- Page: Interview -->
+  <div class="main-content page-content" id="page-interview" style="display:none;">
+    <div class="max-w-5xl mx-auto">
+      <h2 class="text-2xl font-bold text-gray-800 mb-6">💼 面试管理</h2>
+      <div class="flex gap-2 mb-4">
+        <button class="tab-btn active" id="tabPrep" onclick="switchInterviewTab('prep')">面试准备</button>
+        <button class="tab-btn" id="tabReview" onclick="switchInterviewTab('review')">面试复盘</button>
+      </div>
+      <div id="interviewPrepList"></div>
+      <div id="interviewReviewList" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- Page: Settings -->
+  <div class="main-content page-content" id="page-settings" style="display:none;">
+    <div class="max-w-3xl mx-auto">
+      <h2 class="text-2xl font-bold text-gray-800 mb-6">⚙️ 设置</h2>
+
+      <!-- Default Tasks -->
+      <div class="card mb-6">
+        <h3 class="font-semibold text-gray-800 mb-4">📋 默认打卡任务</h3>
+        <div id="settingsTasksList"></div>
+        <div class="flex gap-2 mt-3">
+          <input type="text" id="newTaskName" class="input-field flex-1" placeholder="任务名称">
+          <input type="number" id="newTaskCount" class="input-field w-20" placeholder="数量" value="1" min="1">
+          <button onclick="addDefaultTask()" class="btn-primary">添加</button>
+        </div>
+      </div>
+
+      <!-- Sedimentation Options -->
+      <div class="card mb-6">
+        <h3 class="font-semibold text-gray-800 mb-4">📝 应聘沉淀选项</h3>
+        <div id="settingsSedList"></div>
+        <div class="flex gap-2 mt-3">
+          <input type="text" id="newSedOption" class="input-field flex-1" placeholder="新增沉淀选项">
+          <button onclick="addSedOption()" class="btn-primary">添加</button>
+        </div>
+      </div>
+
+      <!-- Weekly Schedule -->
+      <div class="card mb-6">
+        <h3 class="font-semibold text-gray-800 mb-4">📅 每周计划</h3>
+        <p class="text-sm text-gray-500 mb-3">设置每周休息日和每天的投递任务数量</p>
+        <div id="weeklySchedule"></div>
+      </div>
+
+      <!-- Reminder Time -->
+      <div class="card mb-6">
+        <h3 class="font-semibold text-gray-800 mb-4">⏰ 打卡提醒时间</h3>
+        <div class="flex items-center gap-3">
+          <input type="time" id="reminderTime" class="input-field w-40" value="20:00" onchange="saveReminderTime()">
+          <span class="text-sm text-gray-500">北京时间，未完成打卡将提醒</span>
+        </div>
+      </div>
+
+      <!-- Interview Templates -->
+      <div class="card mb-6">
+        <h3 class="font-semibold text-gray-800 mb-4">📄 面试准备默认模板</h3>
+        <p class="text-sm text-gray-500 mb-4">设置后每次面试准备自动填充，无需重复填写</p>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">个人 Slogan</label>
+            <textarea id="tplSlogan" class="input-field" rows="2" oninput="saveTemplates()"></textarea>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">职业动机</label>
+            <textarea id="tplMotivation" class="input-field" rows="2" oninput="saveTemplates()"></textarea>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">过往经历</label>
+            <textarea id="tplExperience" class="input-field" rows="2" oninput="saveTemplates()"></textarea>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">自我认知</label>
+            <textarea id="tplSelfAware" class="input-field" rows="2" oninput="saveTemplates()"></textarea>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">自我介绍</label>
+            <textarea id="tplSelfIntro" class="input-field" rows="2" oninput="saveTemplates()"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Data Management -->
+      <div class="card mb-6">
+        <h3 class="font-semibold text-gray-800 mb-4">💾 数据管理</h3>
+        <div class="flex gap-3 flex-wrap">
+          <button onclick="exportData()" class="btn-secondary">📤 导出数据</button>
+          <button onclick="document.getElementById('importFile').click()" class="btn-secondary">📥 导入数据</button>
+          <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+        </div>
+        <p class="text-xs text-gray-400 mt-2">导出数据后可在其他设备导入，实现跨设备同步</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Page: Account -->
+  <div class="main-content page-content" id="page-account" style="display:none;">
+    <div class="max-w-lg mx-auto">
+      <h2 class="text-2xl font-bold text-gray-800 mb-6">👤 账号管理</h2>
+      <div class="card mb-6">
+        <h3 class="font-semibold text-gray-800 mb-4">账号信息</h3>
+        <div class="flex items-center gap-4 mb-4">
+          <div class="w-16 h-16 rounded-2xl bg-blue-100 flex items-center justify-center text-3xl">👤</div>
+          <div>
+            <p class="font-semibold text-lg" id="accountUsername"></p>
+            <p class="text-sm text-gray-400">注册时间：<span id="accountRegTime"></span></p>
+          </div>
+        </div>
+      </div>
+      <div class="card mb-6">
+        <h3 class="font-semibold text-gray-800 mb-4">修改密码</h3>
+        <div class="space-y-3">
+          <input type="password" id="oldPass" class="input-field" placeholder="当前密码">
+          <input type="password" id="newPass" class="input-field" placeholder="新密码（至少6位）">
+          <input type="password" id="newPass2" class="input-field" placeholder="确认新密码">
+          <button onclick="changePassword()" class="btn-primary">修改密码</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3 class="font-semibold text-gray-800 mb-4">统计概览</h3>
+        <div class="grid grid-cols-2 gap-4">
+          <div class="bg-blue-50 rounded-xl p-4 text-center">
+            <p class="text-2xl font-bold text-blue-600" id="statDelivery">0</p>
+            <p class="text-xs text-blue-400 mt-1">总投递数</p>
+          </div>
+          <div class="bg-green-50 rounded-xl p-4 text-center">
+            <p class="text-2xl font-bold text-green-600" id="statCheckin">0</p>
+            <p class="text-xs text-green-400 mt-1">打卡天数</p>
+          </div>
+          <div class="bg-purple-50 rounded-xl p-4 text-center">
+            <p class="text-2xl font-bold text-purple-600" id="statInterview">0</p>
+            <p class="text-xs text-purple-400 mt-1">面试次数</p>
+          </div>
+          <div class="bg-amber-50 rounded-xl p-4 text-center">
+            <p class="text-2xl font-bold text-amber-600" id="statStreak">0</p>
+            <p class="text-xs text-amber-400 mt-1">连续打卡</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Add Delivery -->
+<div class="modal-overlay" id="modalDelivery">
+  <div class="modal-content">
+    <div class="flex items-center justify-between mb-6">
+      <h3 class="text-lg font-semibold">新增投递</h3>
+      <button onclick="closeModal('modalDelivery')" class="text-gray-400 hover:text-gray-600 cursor-pointer text-xl">✕</button>
+    </div>
+    <div class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">公司名称 *</label>
+        <input type="text" id="dlvCompany" class="input-field" placeholder="公司名称">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">岗位 *</label>
+        <input type="text" id="dlvPosition" class="input-field" placeholder="应聘岗位">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">投递时间</label>
+        <input type="date" id="dlvDate" class="input-field">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">笔试截止时间（选填）</label>
+        <input type="datetime-local" id="dlvPenDeadline" class="input-field">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">面试时间（选填）</label>
+        <input type="datetime-local" id="dlvInterviewTime" class="input-field">
+      </div>
+    </div>
+    <div class="flex gap-3 mt-6">
+      <button onclick="closeModal('modalDelivery')" class="btn-secondary flex-1">取消</button>
+      <button onclick="saveDelivery()" class="btn-primary flex-1">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Checkin Detail -->
+<div class="modal-overlay" id="modalCheckin">
+  <div class="modal-content">
+    <div class="flex items-center justify-between mb-6">
+      <h3 class="text-lg font-semibold" id="checkinModalTitle">打卡</h3>
+      <button onclick="closeModal('modalCheckin')" class="text-gray-400 hover:text-gray-600 cursor-pointer text-xl">✕</button>
+    </div>
+    <div id="checkinModalBody"></div>
+  </div>
+</div>
+
+<!-- Modal: Interview Prep -->
+<div class="modal-overlay" id="modalIntPrep">
+  <div class="modal-content" style="max-width:800px;">
+    <div class="flex items-center justify-between mb-6">
+      <h3 class="text-lg font-semibold" id="intPrepTitle">面试准备</h3>
+      <button onclick="closeModal('modalIntPrep')" class="text-gray-400 hover:text-gray-600 cursor-pointer text-xl">✕</button>
+    </div>
+    <div id="intPrepBody"></div>
+  </div>
+</div>
+
+<!-- Modal: Interview Review -->
+<div class="modal-overlay" id="modalIntReview">
+  <div class="modal-content" style="max-width:800px;">
+    <div class="flex items-center justify-between mb-6">
+      <h3 class="text-lg font-semibold" id="intReviewTitle">面试复盘</h3>
+      <button onclick="closeModal('modalIntReview')" class="text-gray-400 hover:text-gray-600 cursor-pointer text-xl">✕</button>
+    </div>
+    <div id="intReviewBody"></div>
+  </div>
+</div>
+
+<!-- Modal: Prompt Output -->
+<div class="modal-overlay" id="modalPrompt">
+  <div class="modal-content" style="max-width:800px;">
+    <div class="flex items-center justify-between mb-6">
+      <h3 class="text-lg font-semibold">面试准备 Prompt</h3>
+      <button onclick="closeModal('modalPrompt')" class="text-gray-400 hover:text-gray-600 cursor-pointer text-xl">✕</button>
+    </div>
+    <div class="prompt-box" id="promptOutput"></div>
+    <div class="flex gap-3 mt-4">
+      <button onclick="copyPrompt()" class="btn-primary flex-1">📋 复制到剪贴板</button>
+      <button onclick="closeModal('modalPrompt')" class="btn-secondary">关闭</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ======================== CORE DATA LAYER ========================
+const APP_PREFIX = 'CRM_'; // Campus Recruit Manager
+let currentUser = null;
+
+// Simple hash for password (not for production security, but adequate for localStorage demo)
+function simpleHash(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + ch;
+    hash |= 0;
+  }
+  return 'h_' + Math.abs(hash).toString(36);
+}
+
+// Get all registered users
+function getUsers() {
+  return JSON.parse(localStorage.getItem(APP_PREFIX + 'users') || '{}');
+}
+function saveUsers(users) {
+  localStorage.setItem(APP_PREFIX + 'users', JSON.stringify(users));
+}
+
+// User-specific data key
+function userKey(key) {
+  return APP_PREFIX + 'u_' + currentUser + '_' + key;
+}
+function loadUserData(key, defaultVal) {
+  const raw = localStorage.getItem(userKey(key));
+  if (raw === null) return defaultVal;
+  try { return JSON.parse(raw); } catch(e) { return defaultVal; }
+}
+function saveUserData(key, val) {
+  localStorage.setItem(userKey(key), JSON.stringify(val));
+}
+
+// ======================== AUTH ========================
+function switchAuthTab(tab) {
+  document.getElementById('loginForm').style.display = tab === 'login' ? 'block' : 'none';
+  document.getElementById('registerForm').style.display = tab === 'register' ? 'block' : 'none';
+  document.getElementById('authLoginTab').className = tab === 'login' ? 'flex-1 py-2 rounded-lg text-sm font-medium transition cursor-pointer bg-white shadow text-gray-800' : 'flex-1 py-2 rounded-lg text-sm font-medium transition cursor-pointer text-gray-500';
+  document.getElementById('authRegTab').className = tab === 'register' ? 'flex-1 py-2 rounded-lg text-sm font-medium transition cursor-pointer bg-white shadow text-gray-800' : 'flex-1 py-2 rounded-lg text-sm font-medium transition cursor-pointer text-gray-500';
+}
+
+function doRegister() {
+  const u = document.getElementById('regUser').value.trim();
+  const p = document.getElementById('regPass').value;
+  const p2 = document.getElementById('regPass2').value;
+  if (u.length < 3) return showToast('用户名至少3位', 'error');
+  if (p.length < 6) return showToast('密码至少6位', 'error');
+  if (p !== p2) return showToast('两次密码不一致', 'error');
+  const users = getUsers();
+  if (users[u]) return showToast('用户名已存在', 'error');
+  users[u] = { password: simpleHash(p), regTime: new Date().toISOString() };
+  saveUsers(users);
+  showToast('注册成功，请登录', 'success');
+  switchAuthTab('login');
+  document.getElementById('loginUser').value = u;
+}
+
+function doLogin() {
+  const u = document.getElementById('loginUser').value.trim();
+  const p = document.getElementById('loginPass').value;
+  if (!u || !p) return showToast('请输入用户名和密码', 'error');
+  const users = getUsers();
+  if (!users[u]) return showToast('用户不存在', 'error');
+  if (users[u].password !== simpleHash(p)) return showToast('密码错误', 'error');
+  currentUser = u;
+  localStorage.setItem(APP_PREFIX + 'lastUser', u);
+  enterApp();
+  showToast('登录成功，欢迎 ' + u, 'success');
+}
+
+function logout() {
+  currentUser = null;
+  localStorage.removeItem(APP_PREFIX + 'lastUser');
+  document.getElementById('appPage').style.display = 'none';
+  document.getElementById('authPage').style.display = 'flex';
+  document.getElementById('loginPass').value = '';
+}
+
+function changePassword() {
+  const op = document.getElementById('oldPass').value;
+  const np = document.getElementById('newPass').value;
+  const np2 = document.getElementById('newPass2').value;
+  const users = getUsers();
+  if (users[currentUser].password !== simpleHash(op)) return showToast('当前密码错误', 'error');
+  if (np.length < 6) return showToast('新密码至少6位', 'error');
+  if (np !== np2) return showToast('两次新密码不一致', 'error');
+  users[currentUser].password = simpleHash(np);
+  saveUsers(users);
+  showToast('密码修改成功', 'success');
+  document.getElementById('oldPass').value = '';
+  document.getElementById('newPass').value = '';
+  document.getElementById('newPass2').value = '';
+}
+
+function autoLogin() {
+  const last = localStorage.getItem(APP_PREFIX + 'lastUser');
+  if (last) {
+    const users = getUsers();
+    if (users[last]) {
+      currentUser = last;
+      enterApp();
+      return;
+    }
+  }
+  document.getElementById('authPage').style.display = 'flex';
+}
+
+function enterApp() {
+  document.getElementById('authPage').style.display = 'none';
+  document.getElementById('appPage').style.display = 'block';
+  document.getElementById('sidebarUser').textContent = currentUser;
+  document.getElementById('accountUsername').textContent = currentUser;
+  const users = getUsers();
+  document.getElementById('accountRegTime').textContent = users[currentUser].regTime ? new Date(users[currentUser].regTime).toLocaleDateString('zh-CN') : '未知';
+  initSettings();
+  switchPage('checkin');
+  startReminderCheck();
+}
+
+// ======================== TOAST ========================
+function showToast(msg, type = 'success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast toast-' + type + ' show';
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ======================== SIDEBAR / NAV ========================
+function switchPage(page) {
+  document.querySelectorAll('.page-content').forEach(p => p.style.display = 'none');
+  document.getElementById('page-' + page).style.display = 'block';
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.page === page));
+  document.getElementById('mobileTitle').textContent = {checkin:'每日打卡', delivery:'投递管理', interview:'面试管理', settings:'设置', account:'账号管理'}[page];
+  if (window.innerWidth < 769) { closeSidebar(); }
+  // Refresh page data
+  if (page === 'checkin') renderCheckin();
+  if (page === 'delivery') renderDeliveries();
+  if (page === 'interview') renderInterviews();
+  if (page === 'account') renderAccountStats();
+  if (page === 'settings') renderSettings();
+}
+
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebarOverlay').classList.toggle('show');
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebarOverlay').classList.remove('show');
+}
+
+// ======================== MODAL ========================
+function openModal(id) { document.getElementById(id).classList.add('show'); }
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+
+// ======================== DATE UTILS ========================
+function todayStr() {
+  return new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD
+}
+function getDayOfWeek(dateStr) {
+  return new Date(dateStr).getDay(); // 0=Sun
+}
+const DAY_NAMES = ['周日','周一','周二','周三','周四','周五','周六'];
+
+// ======================== SETTINGS / DEFAULTS ========================
+const DEFAULT_TASKS = [
+  { name: '投递公司', count: 5 },
+  { name: '完成应聘沉淀', count: 1 }
+];
+const DEFAULT_SED_OPTIONS = [
+  '完成一次简历优化',
+  '完成一次过往工作复盘',
+  '完成一次面试复盘',
+  '完成一次模拟面试',
+  '完成一次英语口语练习'
+];
+
+function getSettings() {
+  return loadUserData('settings', {
+    tasks: [...DEFAULT_TASKS],
+    sedOptions: [...DEFAULT_SED_OPTIONS],
+    restDays: [],    // [0-6]
+    weeklyTasks: {}, // { "1": { "投递公司": 10 }, ... }
+    reminderTime: '20:00',
+    templates: { slogan: '', motivation: '', experience: '', selfAware: '', selfIntro: '' }
+  });
+}
+function saveSettings(s) { saveUserData('settings', s); }
+
+function initSettings() {
+  const s = getSettings();
+  // Ensure all fields exist (migration)
+  if (!s.tasks) s.tasks = [...DEFAULT_TASKS];
+  if (!s.sedOptions) s.sedOptions = [...DEFAULT_SED_OPTIONS];
+  if (!s.restDays) s.restDays = [];
+  if (!s.weeklyTasks) s.weeklyTasks = {};
+  if (!s.reminderTime) s.reminderTime = '20:00';
+  if (!s.templates) s.templates = { slogan: '', motivation: '', experience: '', selfAware: '', selfIntro: '' };
+  saveSettings(s);
+}
+
+function renderSettings() {
+  const s = getSettings();
+  // Tasks
+  let tasksHtml = '';
+  s.tasks.forEach((t, i) => {
+    tasksHtml += `<div class="flex items-center gap-2 mb-2">
+      <input type="text" class="input-field flex-1" value="${escH(t.name)}" onchange="updateTask(${i},'name',this.value)">
+      <input type="number" class="input-field w-20" value="${t.count}" min="1" onchange="updateTask(${i},'count',parseInt(this.value))">
+      <button onclick="removeTask(${i})" class="btn-danger">删除</button>
+    </div>`;
+  });
+  document.getElementById('settingsTasksList').innerHTML = tasksHtml;
+
+  // Sedimentation options
+  let sedHtml = '';
+  s.sedOptions.forEach((o, i) => {
+    sedHtml += `<div class="flex items-center gap-2 mb-2">
+      <input type="text" class="input-field flex-1" value="${escH(o)}" onchange="updateSedOption(${i},this.value)">
+      <button onclick="removeSedOption(${i})" class="btn-danger">删除</button>
+    </div>`;
+  });
+  document.getElementById('settingsSedList').innerHTML = sedHtml;
+
+  // Weekly schedule
+  let weekHtml = '';
+  for (let d = 0; d < 7; d++) {
+    const isRest = s.restDays.includes(d);
+    weekHtml += `<div class="flex items-center gap-3 mb-2 p-2 rounded-lg ${isRest ? 'bg-amber-50' : 'bg-gray-50'}">
+      <span class="w-10 text-sm font-medium">${DAY_NAMES[d]}</span>
+      <label class="flex items-center gap-1 text-sm cursor-pointer">
+        <input type="checkbox" ${isRest ? 'checked' : ''} onchange="toggleRestDay(${d})"> 休息
+      </label>`;
+    if (!isRest) {
+      s.tasks.forEach((t, ti) => {
+        const custom = (s.weeklyTasks[d] && s.weeklyTasks[d][t.name]) || '';
+        weekHtml += `<div class="flex items-center gap-1 text-sm">
+          <span class="text-gray-500">${escH(t.name)}:</span>
+          <input type="number" class="input-field w-16 text-sm" placeholder="${t.count}" value="${custom}" min="0" onchange="setWeeklyTask(${d},'${escH(t.name)}',this.value)">
+        </div>`;
+      });
+    }
+    weekHtml += `</div>`;
+  }
+  document.getElementById('weeklySchedule').innerHTML = weekHtml;
+
+  // Reminder time
+  document.getElementById('reminderTime').value = s.reminderTime;
+
+  // Templates
+  document.getElementById('tplSlogan').value = s.templates.slogan || '';
+  document.getElementById('tplMotivation').value = s.templates.motivation || '';
+  document.getElementById('tplExperience').value = s.templates.experience || '';
+  document.getElementById('tplSelfAware').value = s.templates.selfAware || '';
+  document.getElementById('tplSelfIntro').value = s.templates.selfIntro || '';
+}
+
+function addDefaultTask() {
+  const name = document.getElementById('newTaskName').value.trim();
+  const count = parseInt(document.getElementById('newTaskCount').value) || 1;
+  if (!name) return showToast('请输入任务名称', 'error');
+  const s = getSettings();
+  s.tasks.push({ name, count });
+  saveSettings(s);
+  document.getElementById('newTaskName').value = '';
+  document.getElementById('newTaskCount').value = '1';
+  renderSettings();
+  showToast('任务已添加');
+}
+function updateTask(i, field, val) {
+  const s = getSettings();
+  if (field === 'count') val = Math.max(1, val);
+  s.tasks[i][field] = val;
+  saveSettings(s);
+}
+function removeTask(i) {
+  const s = getSettings();
+  s.tasks.splice(i, 1);
+  saveSettings(s);
+  renderSettings();
+}
+function addSedOption() {
+  const val = document.getElementById('newSedOption').value.trim();
+  if (!val) return showToast('请输入选项', 'error');
+  const s = getSettings();
+  s.sedOptions.push(val);
+  saveSettings(s);
+  document.getElementById('newSedOption').value = '';
+  renderSettings();
+  showToast('选项已添加');
+}
+function updateSedOption(i, val) {
+  const s = getSettings();
+  s.sedOptions[i] = val;
+  saveSettings(s);
+}
+function removeSedOption(i) {
+  const s = getSettings();
+  s.sedOptions.splice(i, 1);
+  saveSettings(s);
+  renderSettings();
+}
+function toggleRestDay(d) {
+  const s = getSettings();
+  const idx = s.restDays.indexOf(d);
+  if (idx >= 0) s.restDays.splice(idx, 1);
+  else s.restDays.push(d);
+  saveSettings(s);
+  renderSettings();
+}
+function setWeeklyTask(day, taskName, val) {
+  const s = getSettings();
+  if (!s.weeklyTasks[day]) s.weeklyTasks[day] = {};
+  if (val === '' || val === '0') delete s.weeklyTasks[day][taskName];
+  else s.weeklyTasks[day][taskName] = parseInt(val);
+  saveSettings(s);
+}
+function saveReminderTime() {
+  const s = getSettings();
+  s.reminderTime = document.getElementById('reminderTime').value;
+  saveSettings(s);
+  showToast('提醒时间已保存');
+}
+function saveTemplates() {
+  const s = getSettings();
+  s.templates.slogan = document.getElementById('tplSlogan').value;
+  s.templates.motivation = document.getElementById('tplMotivation').value;
+  s.templates.experience = document.getElementById('tplExperience').value;
+  s.templates.selfAware = document.getElementById('tplSelfAware').value;
+  s.templates.selfIntro = document.getElementById('tplSelfIntro').value;
+  saveSettings(s);
+}
+
+// ======================== CHECKIN ========================
+function getCheckins() { return loadUserData('checkins', {}); }
+function saveCheckins(c) { saveUserData('checkins', c); }
+
+// Get task counts for a specific day (considering weekly customization and carryover)
+function getTasksForDay(dateStr) {
+  const s = getSettings();
+  const dow = getDayOfWeek(dateStr);
+  const tasks = [];
+  s.tasks.forEach(t => {
+    let count = t.count;
+    if (s.weeklyTasks[dow] && s.weeklyTasks[dow][t.name]) {
+      count = s.weeklyTasks[dow][t.name];
+    }
+    tasks.push({ name: t.name, count });
+  });
+  // Add carryover from previous uncompleted days
+  const carryover = getCarryover(dateStr);
+  if (carryover) {
+    carryover.forEach(co => {
+      const existing = tasks.find(t => t.name === co.name);
+      if (existing) existing.count += co.count;
+      else tasks.push({ name: co.name, count: co.count });
+    });
+  }
+  return tasks;
+}
+
+function getCarryover(dateStr) {
+  const carry = loadUserData('carryover', {});
+  return carry[dateStr] || null;
+}
+function setCarryover(dateStr, tasks) {
+  const carry = loadUserData('carryover', {});
+  carry[dateStr] = tasks;
+  saveUserData('carryover', carry);
+}
+function clearCarryover(dateStr) {
+  const carry = loadUserData('carryover', {});
+  delete carry[dateStr];
+  saveUserData('carryover', carry);
+}
+
+let calYear, calMonth;
+
+function renderCheckin() {
+  const today = todayStr();
+  const dow = getDayOfWeek(today);
+  const s = getSettings();
+  const isRestDay = s.restDays.includes(dow);
+  const checkins = getCheckins();
+  const todayCheckin = checkins[today];
+
+  document.getElementById('todayDateLabel').textContent = today;
+  document.getElementById('todayDayLabel').textContent = DAY_NAMES[dow];
+
+  if (isRestDay && !todayCheckin) {
+    document.getElementById('todayRestDay').style.display = 'block';
+    document.getElementById('todayTasks').innerHTML = '';
+    document.getElementById('todayCheckinArea').innerHTML = '';
+  } else {
+    document.getElementById('todayRestDay').style.display = 'none';
+    renderTodayTasks(today, todayCheckin);
+  }
+
+  // Calendar
+  if (!calYear) { const d = new Date(); calYear = d.getFullYear(); calMonth = d.getMonth(); }
+  renderCalendar();
+}
+
+function forceCheckinToday() {
+  document.getElementById('todayRestDay').style.display = 'none';
+  renderTodayTasks(todayStr(), null);
+}
+
+function renderTodayTasks(dateStr, checkinData) {
+  const tasks = getTasksForDay(dateStr);
+  const s = getSettings();
+  let html = '';
+
+  if (checkinData && checkinData.completed) {
+    // Already checked in
+    html += `<div class="text-center py-4">
+      <div class="text-5xl mb-3 check-anim">✅</div>
+      <p class="text-green-600 font-semibold text-lg">今日打卡已完成！</p>
+      <div class="mt-4 text-left bg-green-50 rounded-xl p-4">`;
+    if (checkinData.taskResults) {
+      checkinData.taskResults.forEach(tr => {
+        html += `<p class="text-sm text-green-700 mb-1">✓ ${escH(tr.name)}: ${tr.done}/${tr.target}</p>`;
+      });
+    }
+    if (checkinData.sedimentations && checkinData.sedimentations.length > 0) {
+      html += `<p class="text-sm text-green-700 mt-2 font-medium">应聘沉淀：</p>`;
+      checkinData.sedimentations.forEach(sd => {
+        html += `<p class="text-sm text-green-600 ml-2">• ${escH(sd)}</p>`;
+      });
+    }
+    if (checkinData.companies && checkinData.companies.length > 0) {
+      html += `<p class="text-sm text-green-700 mt-2 font-medium">投递公司：</p>`;
+      checkinData.companies.forEach(c => {
+        html += `<p class="text-sm text-green-600 ml-2">• ${escH(c.company)} - ${escH(c.position)}</p>`;
+      });
+    }
+    html += `</div></div>`;
+    document.getElementById('todayTasks').innerHTML = html;
+    document.getElementById('todayCheckinArea').innerHTML = '';
+    return;
+  }
+
+  // Show tasks to complete
+  tasks.forEach((t, i) => {
+    html += `<div class="flex items-center justify-between p-3 bg-gray-50 rounded-xl mb-2">
+      <span class="text-sm font-medium text-gray-700">${escH(t.name)}</span>
+      <span class="text-sm text-gray-500">目标: <strong>${t.count}</strong></span>
+    </div>`;
+  });
+
+  document.getElementById('todayTasks').innerHTML = html;
+
+  // Checkin button
+  document.getElementById('todayCheckinArea').innerHTML = `
+    <button onclick="openCheckinModal('${dateStr}')" class="btn-primary w-full py-4 text-lg mt-2">
+      ✏️ 开始打卡
+    </button>`;
+}
+
+function openCheckinModal(dateStr) {
+  const tasks = getTasksForDay(dateStr);
+  const s = getSettings();
+  const isToday = dateStr === todayStr();
+  document.getElementById('checkinModalTitle').textContent = isToday ? '今日打卡' : dateStr + ' 补打卡';
+
+  let html = '';
+  // Task inputs
+  tasks.forEach((t, i) => {
+    const isDelivery = t.name.includes('投递');
+    html += `<div class="mb-4">
+      <label class="block text-sm font-medium text-gray-700 mb-1">${escH(t.name)} (目标: ${t.count})</label>
+      <input type="number" id="taskInput_${i}" class="input-field" value="${t.count}" min="0" max="999">
+    </div>`;
+    if (isDelivery) {
+      html += `<div class="mb-4 bg-blue-50 rounded-xl p-4" id="deliveryInputArea_${i}">
+        <p class="text-sm font-medium text-blue-700 mb-2">📮 投递公司详情</p>
+        <div id="companyInputs_${i}"></div>
+        <button onclick="addCompanyInput(${i})" class="text-sm text-blue-600 hover:text-blue-800 mt-2 cursor-pointer">+ 添加公司</button>
+      </div>`;
+    }
+  });
+
+  // Sedimentation multi-select
+  html += `<div class="mb-4">
+    <label class="block text-sm font-medium text-gray-700 mb-2">应聘沉淀（至少选1个）</label>`;
+  s.sedOptions.forEach((opt, i) => {
+    html += `<label class="flex items-center gap-2 p-2 hover:bg-gray-50 rounded-lg cursor-pointer mb-1">
+      <input type="checkbox" class="sed-check" value="${escH(opt)}"> 
+      <span class="text-sm text-gray-700">${escH(opt)}</span>
+    </label>`;
+  });
+  html += `</div>`;
+
+  html += `<div class="flex gap-3 mt-6">
+    <button onclick="closeModal('modalCheckin')" class="btn-secondary flex-1">取消</button>
+    <button onclick="submitCheckin('${dateStr}')" class="btn-primary flex-1">完成打卡</button>
+  </div>`;
+
+  document.getElementById('checkinModalBody').innerHTML = html;
+
+  // Initialize company inputs for delivery tasks
+  tasks.forEach((t, i) => {
+    if (t.name.includes('投递')) {
+      const container = document.getElementById('companyInputs_' + i);
+      if (container) {
+        for (let c = 0; c < t.count; c++) {
+          addCompanyInputRow(container);
+        }
+      }
+    }
+  });
+
+  openModal('modalCheckin');
+}
+
+function addCompanyInput(taskIdx) {
+  const container = document.getElementById('companyInputs_' + taskIdx);
+  if (container) addCompanyInputRow(container);
+}
+
+function addCompanyInputRow(container) {
+  const div = document.createElement('div');
+  div.className = 'flex gap-2 mb-2';
+  div.innerHTML = `<input type="text" class="input-field flex-1 company-name" placeholder="公司名称">
+    <input type="text" class="input-field flex-1 company-position" placeholder="岗位">
+    <button onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-600 px-2 cursor-pointer">✕</button>`;
+  container.appendChild(div);
+}
+
+function submitCheckin(dateStr) {
+  const tasks = getTasksForDay(dateStr);
+  const s = getSettings();
+  const taskResults = [];
+  const companies = [];
+
+  tasks.forEach((t, i) => {
+    const done = parseInt(document.getElementById('taskInput_' + i).value) || 0;
+    taskResults.push({ name: t.name, target: t.count, done });
+
+    if (t.name.includes('投递')) {
+      const container = document.getElementById('companyInputs_' + i);
+      if (container) {
+        const rows = container.querySelectorAll('.flex');
+        rows.forEach(row => {
+          const company = row.querySelector('.company-name').value.trim();
+          const position = row.querySelector('.company-position').value.trim();
+          if (company) companies.push({ company, position: position || '未填写' });
+        });
+      }
+    }
+  });
+
+  // Check sedimentation
+  const sedChecks = document.querySelectorAll('.sed-check:checked');
+  if (sedChecks.length === 0) return showToast('请至少选择一个应聘沉淀', 'error');
+  const sedimentations = Array.from(sedChecks).map(c => c.value);
+
+  // Save checkin
+  const checkins = getCheckins();
+  const isToday = dateStr === todayStr();
+  checkins[dateStr] = {
+    completed: true,
+    timestamp: new Date().toISOString(),
+    taskResults,
+    sedimentations,
+    companies,
+    isMakeup: !isToday
+  };
+  saveCheckins(checkins);
+  clearCarryover(dateStr);
+
+  // Auto-create deliveries from companies
+  if (companies.length > 0) {
+    const deliveries = getDeliveries();
+    companies.forEach(c => {
+      deliveries.push({
+        id: Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+        company: c.company,
+        position: c.position,
+        submitDate: dateStr,
+        penDeadline: '',
+        interviewTime: '',
+        status: '已投递',
+        interviewPrep: null,
+        interviewReview: null
+      });
+    });
+    saveDeliveries(deliveries);
+  }
+
+  closeModal('modalCheckin');
+  showToast('打卡成功！🎉', 'success');
+  renderCheckin();
+}
+
+function postponeCheckin(dateStr) {
+  // Calculate next working day
+  const s = getSettings();
+  const tasks = getTasksForDay(dateStr);
+  const checkins = getCheckins();
+  const todayData = checkins[dateStr];
+  
+  let uncompleted = [];
+  tasks.forEach(t => {
+    let done = 0;
+    if (todayData && todayData.taskResults) {
+      const tr = todayData.taskResults.find(r => r.name === t.name);
+      if (tr) done = tr.done;
+    }
+    const remaining = t.count - done;
+    if (remaining > 0) uncompleted.push({ name: t.name, count: remaining });
+  });
+
+  if (uncompleted.length === 0) return showToast('没有未完成的任务', 'warning');
+
+  // Find next day
+  const next = new Date(dateStr);
+  next.setDate(next.getDate() + 1);
+  const nextStr = next.toLocaleDateString('sv-SE');
+  setCarryover(nextStr, uncompleted);
+  showToast('未完成任务已累计到明天', 'warning');
+}
+
+function changeCalMonth(delta) {
+  calMonth += delta;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  if (calMonth < 0) { calMonth = 11; calYear--; }
+  renderCalendar();
+}
+
+function renderCalendar() {
+  const s = getSettings();
+  const checkins = getCheckins();
+  const label = `${calYear}年${calMonth + 1}月`;
+  document.getElementById('calMonthLabel').textContent = label;
+
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const today = todayStr();
+
+  let html = '';
+  // Empty cells
+  for (let i = 0; i < firstDay; i++) html += `<div class="cal-day"></div>`;
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const dow = getDayOfWeek(dateStr);
+    const isRest = s.restDays.includes(dow);
+    const checkin = checkins[dateStr];
+    let cls = 'cal-day';
+    if (dateStr === today) cls += ' today';
+    
+    if (checkin && checkin.completed) {
+      cls += checkin.isMakeup ? ' makeup' : ' checked';
+    } else if (dateStr < today && !isRest) {
+      cls += ' missed';
+    } else if (isRest) {
+      cls += ' rest-day';
+    }
+
+    const canMakeup = dateStr < today && (!checkin || !checkin.completed) && !isRest;
+    html += `<div class="${cls}" ${canMakeup ? `onclick="openCheckinModal('${dateStr}')" title="点击补打卡"` : ''} ${dateStr === today && (!checkin || !checkin.completed) ? `onclick="openCheckinModal('${dateStr}')"` : ''}>${d}</div>`;
+  }
+
+  document.getElementById('calendarGrid').innerHTML = html;
+}
+
+// ======================== DELIVERIES ========================
+function getDeliveries() { return loadUserData('deliveries', []); }
+function saveDeliveries(d) { saveUserData('deliveries', d); }
+
+const STATUS_OPTIONS = ['已投递','待笔试','已笔试','待面试','已面试','简历挂','笔试挂','面试挂','放弃'];
+const STATUS_BADGE_MAP = {
+  '已投递': 'badge-submitted',
+  '待笔试': 'badge-pen-wait',
+  '已笔试': 'badge-pen-done',
+  '待面试': 'badge-interview-wait',
+  '已面试': 'badge-interview-done',
+  '简历挂': 'badge-resume-fail',
+  '笔试挂': 'badge-pen-fail',
+  '面试挂': 'badge-interview-fail',
+  '放弃': 'badge-give-up'
+};
+
+function showAddDelivery() {
+  document.getElementById('dlvCompany').value = '';
+  document.getElementById('dlvPosition').value = '';
+  document.getElementById('dlvDate').value = todayStr();
+  document.getElementById('dlvPenDeadline').value = '';
+  document.getElementById('dlvInterviewTime').value = '';
+  openModal('modalDelivery');
+}
+
+function saveDelivery() {
+  const company = document.getElementById('dlvCompany').value.trim();
+  const position = document.getElementById('dlvPosition').value.trim();
+  if (!company || !position) return showToast('请填写公司名称和岗位', 'error');
+  
+  const deliveries = getDeliveries();
+  deliveries.push({
+    id: Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+    company,
+    position,
+    submitDate: document.getElementById('dlvDate').value || todayStr(),
+    penDeadline: document.getElementById('dlvPenDeadline').value || '',
+    interviewTime: document.getElementById('dlvInterviewTime').value || '',
+    status: '已投递',
+    interviewPrep: null,
+    interviewReview: null
+  });
+  saveDeliveries(deliveries);
+  closeModal('modalDelivery');
+  showToast('投递记录已添加', 'success');
+  renderDeliveries();
+}
+
+function renderDeliveries() {
+  const deliveries = getDeliveries();
+  const search = (document.getElementById('deliverySearch')?.value || '').toLowerCase();
+  const filter = document.getElementById('deliveryFilter')?.value || '';
+
+  let filtered = deliveries.filter(d => {
+    if (search && !d.company.toLowerCase().includes(search) && !d.position.toLowerCase().includes(search)) return false;
+    if (filter && d.status !== filter) return false;
+    return true;
+  });
+
+  if (filtered.length === 0) {
+    document.getElementById('deliveryList').innerHTML = `
+      <div class="card text-center py-12">
+        <div class="text-4xl mb-3">📭</div>
+        <p class="text-gray-500">暂无投递记录</p>
+        <p class="text-sm text-gray-400 mt-1">打卡时填写的投递公司会自动出现在这里</p>
+      </div>`;
+    return;
+  }
+
+  let html = '<div class="space-y-3">';
+  filtered.forEach(d => {
+    html += `<div class="card p-4">
+      <div class="flex items-start justify-between flex-wrap gap-2">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-1">
+            <h4 class="font-semibold text-gray-800 truncate">${escH(d.company)}</h4>
+            <span class="badge ${STATUS_BADGE_MAP[d.status] || ''}">${d.status}</span>
+          </div>
+          <p class="text-sm text-gray-500">${escH(d.position)}</p>
+          <div class="flex items-center gap-4 mt-2 text-xs text-gray-400 flex-wrap">
+            <span>📅 投递: ${d.submitDate}</span>
+            ${d.penDeadline ? `<span>📝 笔试截止: ${d.penDeadline.replace('T', ' ')}</span>` : ''}
+            ${d.interviewTime ? `<span>🎤 面试: ${d.interviewTime.replace('T', ' ')}</span>` : ''}
+          </div>
+        </div>
+        <div class="flex items-center gap-2 flex-shrink-0">
+          <select class="input-field text-sm py-1 px-2" value="${d.status}" onchange="changeDeliveryStatus('${d.id}', this.value)">
+            ${STATUS_OPTIONS.map(s => `<option value="${s}" ${d.status === s ? 'selected' : ''}>${s}</option>`).join('')}
+          </select>
+          <button onclick="editDeliveryDetail('${d.id}')" class="btn-secondary py-1 px-2 text-sm">编辑</button>
+          <button onclick="deleteDelivery('${d.id}')" class="btn-danger py-1 px-2">删除</button>
+        </div>
+      </div>
+    </div>`;
+  });
+  html += '</div>';
+  document.getElementById('deliveryList').innerHTML = html;
+}
+
+function changeDeliveryStatus(id, newStatus) {
+  const deliveries = getDeliveries();
+  const d = deliveries.find(x => x.id === id);
+  if (!d) return;
+  d.status = newStatus;
+  saveDeliveries(deliveries);
+  showToast('状态已更新', 'success');
+  renderDeliveries();
+}
+
+function deleteDelivery(id) {
+  if (!confirm('确定删除此投递记录？')) return;
+  let deliveries = getDeliveries();
+  deliveries = deliveries.filter(d => d.id !== id);
+  saveDeliveries(deliveries);
+  showToast('已删除', 'success');
+  renderDeliveries();
+}
+
+function editDeliveryDetail(id) {
+  const deliveries = getDeliveries();
+  const d = deliveries.find(x => x.id === id);
+  if (!d) return;
+  document.getElementById('dlvCompany').value = d.company;
+  document.getElementById('dlvPosition').value = d.position;
+  document.getElementById('dlvDate').value = d.submitDate;
+  document.getElementById('dlvPenDeadline').value = d.penDeadline || '';
+  document.getElementById('dlvInterviewTime').value = d.interviewTime || '';
+  
+  // Modify save button to update
+  const modal = document.getElementById('modalDelivery');
+  modal.querySelector('.btn-primary').onclick = function() {
+    d.company = document.getElementById('dlvCompany').value.trim();
+    d.position = document.getElementById('dlvPosition').value.trim();
+    d.submitDate = document.getElementById('dlvDate').value;
+    d.penDeadline = document.getElementById('dlvPenDeadline').value;
+    d.interviewTime = document.getElementById('dlvInterviewTime').value;
+    saveDeliveries(deliveries);
+    closeModal('modalDelivery');
+    showToast('更新成功', 'success');
+    renderDeliveries();
+    // Restore original handler
+    modal.querySelector('.btn-primary').onclick = saveDelivery;
+  };
+  openModal('modalDelivery');
+}
+
+// ======================== INTERVIEWS ========================
+function switchInterviewTab(tab) {
+  document.getElementById('tabPrep').classList.toggle('active', tab === 'prep');
+  document.getElementById('tabReview').classList.toggle('active', tab === 'review');
+  document.getElementById('interviewPrepList').style.display = tab === 'prep' ? 'block' : 'none';
+  document.getElementById('interviewReviewList').style.display = tab === 'review' ? 'block' : 'none';
+  renderInterviews();
+}
+
+function renderInterviews() {
+  const deliveries = getDeliveries();
+  
+  // Prep: status = 待面试
+  const prepList = deliveries.filter(d => d.status === '待面试');
+  if (prepList.length === 0) {
+    document.getElementById('interviewPrepList').innerHTML = `<div class="card text-center py-12">
+      <div class="text-4xl mb-3">📋</div>
+      <p class="text-gray-500">暂无待面试的公司</p>
+      <p class="text-sm text-gray-400 mt-1">在投递管理中将状态改为「待面试」即可</p>
+    </div>`;
+  } else {
+    let html = '<div class="space-y-3">';
+    prepList.forEach(d => {
+      const hasPrep = d.interviewPrep && d.interviewPrep.jd;
+      html += `<div class="card p-4">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <h4 class="font-semibold text-gray-800">${escH(d.company)}</h4>
+            <p class="text-sm text-gray-500">${escH(d.position)}</p>
+            ${d.interviewTime ? `<p class="text-xs text-gray-400 mt-1">🕐 面试时间: ${d.interviewTime.replace('T', ' ')}</p>` : ''}
+          </div>
+          <div class="flex gap-2">
+            <span class="badge ${hasPrep ? 'badge-pen-done' : 'badge-pen-wait'}">${hasPrep ? '已准备' : '未准备'}</span>
+            <button onclick="openInterviewPrep('${d.id}')" class="btn-primary text-sm py-1">${hasPrep ? '编辑准备' : '开始准备'}</button>
+          </div>
+        </div>
+      </div>`;
+    });
+    html += '</div>';
+    document.getElementById('interviewPrepList').innerHTML = html;
+  }
+
+  // Review: status = 已面试
+  const reviewList = deliveries.filter(d => d.status === '已面试');
+  if (reviewList.length === 0) {
+    document.getElementById('interviewReviewList').innerHTML = `<div class="card text-center py-12">
+      <div class="text-4xl mb-3">📝</div>
+      <p class="text-gray-500">暂无已面试的公司</p>
+      <p class="text-sm text-gray-400 mt-1">面试完成后将状态改为「已面试」</p>
+    </div>`;
+  } else {
+    let html = '<div class="space-y-3">';
+    reviewList.forEach(d => {
+      const hasReview = d.interviewReview && d.interviewReview.transcript;
+      html += `<div class="card p-4">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <h4 class="font-semibold text-gray-800">${escH(d.company)}</h4>
+            <p class="text-sm text-gray-500">${escH(d.position)}</p>
+          </div>
+          <div class="flex gap-2">
+            <span class="badge ${hasReview ? 'badge-pen-done' : 'badge-pen-wait'}">${hasReview ? '已复盘' : '待复盘'}</span>
+            <button onclick="openInterviewReview('${d.id}')" class="btn-primary text-sm py-1">${hasReview ? '查看复盘' : '开始复盘'}</button>
+          </div>
+        </div>
+      </div>`;
+    });
+    html += '</div>';
+    document.getElementById('interviewReviewList').innerHTML = html;
+  }
+}
+
+function openInterviewPrep(id) {
+  const deliveries = getDeliveries();
+  const d = deliveries.find(x => x.id === id);
+  if (!d) return;
+  const s = getSettings();
+  const prep = d.interviewPrep || {};
+
+  document.getElementById('intPrepTitle').textContent = `面试准备 - ${d.company}`;
+  
+  let html = `<div class="space-y-4">
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">岗位 JD *</label>
+      <textarea id="prepJD" class="input-field" rows="4" placeholder="粘贴岗位JD...">${escH(prep.jd || '')}</textarea>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">薪资待遇（选填）</label>
+      <input type="text" id="prepSalary" class="input-field" value="${escH(prep.salary || '')}" placeholder="如：15-25K">
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">个人 Slogan</label>
+      <textarea id="prepSlogan" class="input-field" rows="2">${escH(prep.slogan || s.templates.slogan || '')}</textarea>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">职业动机</label>
+      <textarea id="prepMotivation" class="input-field" rows="2">${escH(prep.motivation || s.templates.motivation || '')}</textarea>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">过往经历</label>
+      <textarea id="prepExperience" class="input-field" rows="2">${escH(prep.experience || s.templates.experience || '')}</textarea>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">自我认知</label>
+      <textarea id="prepSelfAware" class="input-field" rows="2">${escH(prep.selfAware || s.templates.selfAware || '')}</textarea>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">自我介绍</label>
+      <textarea id="prepSelfIntro" class="input-field" rows="2">${escH(prep.selfIntro || s.templates.selfIntro || '')}</textarea>
+    </div>
+    <div class="flex gap-3 mt-6 flex-wrap">
+      <button onclick="saveInterviewPrep('${d.id}')" class="btn-primary flex-1">💾 保存</button>
+      <button onclick="generatePrompt('${d.id}')" class="btn-secondary flex-1">🤖 生成面试 Prompt</button>
+    </div>
+  </div>`;
+
+  document.getElementById('intPrepBody').innerHTML = html;
+  openModal('modalIntPrep');
+}
+
+function saveInterviewPrep(id) {
+  const deliveries = getDeliveries();
+  const d = deliveries.find(x => x.id === id);
+  if (!d) return;
+
+  d.interviewPrep = {
+    jd: document.getElementById('prepJD').value,
+    salary: document.getElementById('prepSalary').value,
+    slogan: document.getElementById('prepSlogan').value,
+    motivation: document.getElementById('prepMotivation').value,
+    experience: document.getElementById('prepExperience').value,
+    selfAware: document.getElementById('prepSelfAware').value,
+    selfIntro: document.getElementById('prepSelfIntro').value,
+    updatedAt: new Date().toISOString()
+  };
+  saveDeliveries(deliveries);
+  showToast('面试准备已保存', 'success');
+  renderInterviews();
+}
+
+function generatePrompt(id) {
+  // Save first
+  saveInterviewPrep(id);
+
+  const deliveries = getDeliveries();
+  const d = deliveries.find(x => x.id === id);
+  if (!d || !d.interviewPrep) return;
+  const p = d.interviewPrep;
+
+  if (!p.jd) return showToast('请先填写岗位JD', 'error');
+
+  const prompt = `我现在要面试【${d.company}】的【${d.position}】，JD如下：
+【${p.jd}】
+
+我的个人slogan：【${p.slogan || '未填写'}】
+职业动机：【${p.motivation || '未填写'}】
+过往经历：【${p.experience || '未填写'}】
+自我认知：【${p.selfAware || '未填写'}】
+自我介绍：【${p.selfIntro || '未填写'}】
+
+请结合简历输出面试准备文档，结构如下：
+1. 面经真题（来源链接标注）
+2. 候选人画像
+2.1 JD
+2.2 核心能力
+3. 业务理解
+3.1 业务部门、产品服务、变现路径
+3.2 岗位理解与价值
+4. 个人slogan
+4.1 优势：做过什么、积累、擅长
+4.2 自我介绍
+5. 职业动机（Why 行业 / 岗位 / 公司 / 我）
+5.1 经历逻辑
+5.2 职业方向
+5.3 职业规划
+6. 经历深挖
+6.1 整体逻辑
+6.2 项目细节、数据、困难、优化点
+7. 自我认知（优缺点）`;
+
+  document.getElementById('promptOutput').textContent = prompt;
+  openModal('modalPrompt');
+}
+
+function copyPrompt() {
+  const text = document.getElementById('promptOutput').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    showToast('已复制到剪贴板！', 'success');
+  }).catch(() => {
+    // Fallback
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('已复制到剪贴板！', 'success');
+  });
+}
+
+function openInterviewReview(id) {
+  const deliveries = getDeliveries();
+  const d = deliveries.find(x => x.id === id);
+  if (!d) return;
+  const review = d.interviewReview || {};
+  const prep = d.interviewPrep || {};
+
+  document.getElementById('intReviewTitle').textContent = `面试复盘 - ${d.company}`;
+
+  let html = `<div class="space-y-4">
+    <div class="bg-gray-50 rounded-xl p-4">
+      <h4 class="font-medium text-gray-700 mb-2">基本信息</h4>
+      <p class="text-sm text-gray-600">公司：${escH(d.company)}</p>
+      <p class="text-sm text-gray-600">岗位：${escH(d.position)}</p>
+      ${prep.jd ? `<p class="text-sm text-gray-600 mt-2">JD：${escH(prep.jd).substring(0, 100)}...</p>` : ''}
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">面试录音转文字 / 面试回忆记录</label>
+      <textarea id="reviewTranscript" class="input-field" rows="6" placeholder="粘贴面试录音转文字或回忆面试内容...">${escH(review.transcript || '')}</textarea>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">本次面试优点</label>
+      <textarea id="reviewStrengths" class="input-field" rows="3" placeholder="回顾面试中表现好的地方...">${escH(review.strengths || '')}</textarea>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">缺点与问题</label>
+      <textarea id="reviewWeaknesses" class="input-field" rows="3" placeholder="回顾面试中的不足和问题...">${escH(review.weaknesses || '')}</textarea>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">面试官态度</label>
+      <textarea id="reviewAttitude" class="input-field" rows="2" placeholder="面试官的态度和反馈...">${escH(review.attitude || '')}</textarea>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">可复盘点</label>
+      <textarea id="reviewReflections" class="input-field" rows="3" placeholder="值得深入复盘的要点...">${escH(review.reflections || '')}</textarea>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">可优化内容</label>
+      <textarea id="reviewImprovements" class="input-field" rows="3" placeholder="下次面试可以改进的地方...">${escH(review.improvements || '')}</textarea>
+    </div>
+    <div class="flex gap-3 mt-6 flex-wrap">
+      <button onclick="saveInterviewReview('${d.id}')" class="btn-primary flex-1">💾 保存复盘</button>
+      <button onclick="generateReviewPrompt('${d.id}')" class="btn-secondary flex-1">🤖 生成 AI 复盘 Prompt</button>
+    </div>
+  </div>`;
+
+  document.getElementById('intReviewBody').innerHTML = html;
+  openModal('modalIntReview');
+}
+
+function saveInterviewReview(id) {
+  const deliveries = getDeliveries();
+  const d = deliveries.find(x => x.id === id);
+  if (!d) return;
+
+  d.interviewReview = {
+    transcript: document.getElementById('reviewTranscript').value,
+    strengths: document.getElementById('reviewStrengths').value,
+    weaknesses: document.getElementById('reviewWeaknesses').value,
+    attitude: document.getElementById('reviewAttitude').value,
+    reflections: document.getElementById('reviewReflections').value,
+    improvements: document.getElementById('reviewImprovements').value,
+    updatedAt: new Date().toISOString()
+  };
+  saveDeliveries(deliveries);
+  showToast('复盘已保存', 'success');
+  renderInterviews();
+}
+
+function generateReviewPrompt(id) {
+  saveInterviewReview(id);
+  const deliveries = getDeliveries();
+  const d = deliveries.find(x => x.id === id);
+  if (!d) return;
+  const review = d.interviewReview || {};
+  const prep = d.interviewPrep || {};
+
+  if (!review.transcript) return showToast('请先填写面试记录', 'error');
+
+  const prompt = `我刚完成了【${d.company}】的【${d.position}】的面试，请帮我进行面试复盘。
+
+${prep.jd ? `岗位JD：\n${prep.jd}\n` : ''}
+面试录音/回忆记录：
+${review.transcript}
+
+${review.strengths ? `我认为的优点：${review.strengths}\n` : ''}
+${review.weaknesses ? `我认为的不足：${review.weaknesses}\n` : ''}
+${review.attitude ? `面试官态度：${review.attitude}\n` : ''}
+
+请帮我分析并输出以下内容：
+1. 本次面试优点总结
+2. 缺点与问题分析
+3. 面试官态度解读
+4. 可复盘的关键点
+5. 具体可优化的改进建议
+6. 下次面试准备建议`;
+
+  document.getElementById('promptOutput').textContent = prompt;
+  openModal('modalPrompt');
+}
+
+// ======================== ACCOUNT STATS ========================
+function renderAccountStats() {
+  const deliveries = getDeliveries();
+  const checkins = getCheckins();
+  
+  document.getElementById('statDelivery').textContent = deliveries.length;
+  document.getElementById('statCheckin').textContent = Object.keys(checkins).filter(k => checkins[k].completed).length;
+  document.getElementById('statInterview').textContent = deliveries.filter(d => d.status === '已面试' || d.status === '面试挂').length;
+
+  // Streak
+  let streak = 0;
+  const s = getSettings();
+  let d = new Date();
+  while (true) {
+    const ds = d.toLocaleDateString('sv-SE');
+    const dow = d.getDay();
+    if (s.restDays.includes(dow)) {
+      d.setDate(d.getDate() - 1);
+      continue;
+    }
+    if (checkins[ds] && checkins[ds].completed) {
+      streak++;
+      d.setDate(d.getDate() - 1);
+    } else if (ds === todayStr()) {
+      // Today not yet checked in, skip
+      d.setDate(d.getDate() - 1);
+    } else {
+      break;
+    }
+    if (streak > 365) break;
+  }
+  document.getElementById('statStreak').textContent = streak;
+}
+
+// ======================== DATA EXPORT/IMPORT ========================
+function exportData() {
+  const data = {};
+  const prefix = APP_PREFIX + 'u_' + currentUser + '_';
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key.startsWith(prefix)) {
+      data[key.replace(prefix, '')] = localStorage.getItem(key);
+    }
+  }
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `校招管家_${currentUser}_${todayStr()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('数据已导出', 'success');
+}
+
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      const prefix = APP_PREFIX + 'u_' + currentUser + '_';
+      Object.keys(data).forEach(key => {
+        localStorage.setItem(prefix + key, data[key]);
+      });
+      showToast('数据导入成功', 'success');
+      initSettings();
+      switchPage('checkin');
+    } catch(err) {
+      showToast('导入失败，文件格式错误', 'error');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+// ======================== REMINDER ========================
+let reminderInterval = null;
+function startReminderCheck() {
+  if (reminderInterval) clearInterval(reminderInterval);
+  reminderInterval = setInterval(checkReminder, 60000); // Check every minute
+}
+
+function checkReminder() {
+  if (!currentUser) return;
+  const s = getSettings();
+  const now = new Date();
+  const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  
+  if (timeStr === s.reminderTime) {
+    const checkins = getCheckins();
+    const today = todayStr();
+    const dow = getDayOfWeek(today);
+    if (!s.restDays.includes(dow) && (!checkins[today] || !checkins[today].completed)) {
+      showToast('⏰ 今天还没打卡哦！快去完成打卡吧', 'warning');
+      // Show browser notification if permitted
+      if (Notification.permission === 'granted') {
+        new Notification('校招管家提醒', { body: '今天还没打卡，记得完成打卡任务！' });
+      }
+    }
+  }
+}
+
+// Request notification permission
+function requestNotifPermission() {
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+}
+
+// ======================== UTILS ========================
+function escH(str) {
+  if (!str) return '';
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// ======================== INIT ========================
+window.addEventListener('DOMContentLoaded', () => {
+  autoLogin();
+  requestNotifPermission();
+});
+
+// Handle enter key on login/register forms
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    if (document.getElementById('authPage').style.display !== 'none') {
+      if (document.getElementById('loginForm').style.display !== 'none') doLogin();
+      else doRegister();
+    }
+  }
+});
+</script>
+</body>
+</html>
