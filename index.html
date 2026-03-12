@@ -730,78 +730,15 @@ body { font-family:'Inter',system-ui,-apple-system,sans-serif; background:#F0F2F
     <button class="btn btn-outline" style="width:100%;" onclick="closeModal('checkinDetailModal')">关闭</button>
   </div>
 </div>
-<!-- Firebase SDKs -->
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<!-- Supabase SDK -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-// ==================== Firebase 初始化 ====================
-const firebaseConfig = {
-  apiKey: "AIzaSyDsZNuQzFnW8T83i6NTZNxqFTh-e0dbTOA",
-  authDomain: "hhmyjob-cc90c.firebaseapp.com",
-  projectId: "hhmyjob-cc90c",
-  storageBucket: "hhmyjob-cc90c.firebasestorage.app",
-  messagingSenderId: "33657880196",
-  appId: "1:33657880196:web:0ece4727c77f623016ccd1",
-  measurementId: "G-8SKWXM214W"
-};
+// ==================== Supabase 初始化 ====================
+const SUPABASE_URL = 'https://pyiwlrpkfzjtnfgccexm.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB5aXdscnBrZnpqdG5mZ2NjZXhtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyODk4MTAsImV4cCI6MjA4ODg2NTgxMH0.pDoPoHellXa3Y67YDH8uE_cwKwpS7-l4pg0xZLe0OrQ';
 
-// 你的代理域名
-const PROXY_DOMAIN = "firebase-proxy-huang.huanghemingyang.workers.dev";
-
-// ==================== 拦截 fetch 请求，使用代理 ====================
-const originalFetch = window.fetch;
-window.fetch = function(url, options) {
-  // 如果是字符串 URL
-  if (typeof url === 'string') {
-    // 拦截 Firebase Auth 请求
-    if (url.includes('identitytoolkit.googleapis.com')) {
-      url = url.replace('identitytoolkit.googleapis.com', PROXY_DOMAIN);
-      console.log('[代理] Auth 请求:', url);
-    }
-    // 拦截 Firebase Firestore 请求
-    else if (url.includes('firestore.googleapis.com')) {
-      url = url.replace('firestore.googleapis.com', PROXY_DOMAIN);
-      console.log('[代理] Firestore 请求:', url);
-    }
-    // 拦截 securetoken 请求
-    else if (url.includes('securetoken.googleapis.com')) {
-      url = url.replace('securetoken.googleapis.com', PROXY_DOMAIN);
-      console.log('[代理] Token 请求:', url);
-    }
-  }
-  // 如果是 Request 对象
-  else if (url instanceof Request) {
-    const originalUrl = url.url;
-    if (originalUrl.includes('identitytoolkit.googleapis.com') || 
-        originalUrl.includes('firestore.googleapis.com') ||
-        originalUrl.includes('securetoken.googleapis.com')) {
-      const newUrl = originalUrl
-        .replace('identitytoolkit.googleapis.com', PROXY_DOMAIN)
-        .replace('firestore.googleapis.com', PROXY_DOMAIN)
-        .replace('securetoken.googleapis.com', PROXY_DOMAIN);
-      console.log('[代理] 请求:', newUrl);
-      url = new Request(newUrl, url);
-    }
-  }
-  
-  return originalFetch(url, options);
-};
-
-// 初始化 Firebase
-firebase.initializeApp(firebaseConfig);
-
-// 初始化 Auth 和 Firestore
-const auth = firebase.auth();
-const db = firebase.firestore();
-
-// 登录状态持久化
-auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-
-// 开启 Firestore 离线持久化
-db.enablePersistence().catch(err => {
-  console.log('Firestore persistence error:', err.code);
-});
+// 初始化 Supabase 客户端
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // ==================== 全局变量 ====================
 let currentUser = null;
 let userData = null;
@@ -906,18 +843,36 @@ async function handleRegister() {
   btn.disabled = true;
   btn.innerHTML = '<span class="loading-spinner"></span> 注册中...';
   try {
-    const cred = await auth.createUserWithEmailAndPassword(email, password);
-    await cred.user.updateProfile({ displayName: username });
+    // Supabase 注册
+    const { data, error } = await supabase.auth.signUp({
+      email: email,
+      password: password,
+      options: {
+        data: {
+          username: username
+        }
+      }
+    });
+    if (error) throw error;
+    
     // 初始化用户数据
-    await db.collection('users').doc(cred.user.uid).set(getDefaultUserData());
-    showToast('注册成功！', 'success');
+    const { error: insertError } = await supabase
+      .from('users_data')
+      .insert([{
+        user_id: data.user.id,
+        data: getDefaultUserData()
+      }]);
+    
+    if (insertError) throw insertError;
+    showToast('注册成功！请查收邮件验证', 'success');
   } catch(err) {
+    console.error('注册错误:', err);
     const msgs = {
-      'auth/email-already-in-use': '该邮箱已被注册',
-      'auth/invalid-email': '邮箱格式不正确',
-      'auth/weak-password': '密码强度不够，至少6位'
+      'User already registered': '该邮箱已被注册',
+      'Invalid email': '邮箱格式不正确',
+      'Password should be at least 6 characters': '密码至少6位'
     };
-    showAuthError(msgs[err.code] || err.message);
+    showAuthError(msgs[err.message] || err.message || '注册失败');
   }
   btn.disabled = false;
   btn.textContent = '注册';
@@ -930,17 +885,21 @@ async function handleLogin() {
   btn.disabled = true;
   btn.innerHTML = '<span class="loading-spinner"></span> 登录中...';
   try {
-    await auth.signInWithEmailAndPassword(email, password);
+    // Supabase 登录
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email,
+      password: password
+    });
+    if (error) throw error;
     showToast('登录成功！', 'success');
   } catch(err) {
+    console.error('登录错误:', err);
     const msgs = {
-      'auth/user-not-found': '用户不存在',
-      'auth/wrong-password': '密码错误',
-      'auth/invalid-email': '邮箱格式不正确',
-      'auth/invalid-credential': '邮箱或密码错误',
-      'auth/too-many-requests': '登录尝试过多，请稍后再试'
+      'Invalid login credentials': '邮箱或密码错误',
+      'Email not confirmed': '请先验证邮箱',
+      'Invalid email': '邮箱格式不正确'
     };
-    showAuthError(msgs[err.code] || err.message);
+    showAuthError(msgs[err.message] || err.message || '登录失败');
   }
   btn.disabled = false;
   btn.textContent = '登录';
@@ -948,17 +907,19 @@ async function handleLogin() {
 async function handleLogout() {
   if(!confirm('确定退出登录？')) return;
   clearTimers();
-  await auth.signOut();
+  await supabase.auth.signOut();
+  location.reload();
 }
 // 监听登录状态
-auth.onAuthStateChanged(async (user) => {
-  if(user) {
-    currentUser = user;
+supabase.auth.onAuthStateChange(async (event, session) => {
+  if (session && session.user) {
+    currentUser = session.user;
     document.getElementById('authPage').style.display = 'none';
     document.getElementById('appPage').style.display = 'block';
-    document.getElementById('userName').textContent = user.displayName || '用户';
-    document.getElementById('userEmail').textContent = user.email;
-    document.getElementById('userAvatar').textContent = (user.displayName||'U')[0].toUpperCase();
+    const username = session.user.user_metadata?.username || session.user.email?.split('@')[0] || '用户';
+    document.getElementById('userName').textContent = username;
+    document.getElementById('userEmail').textContent = session.user.email || '';
+    document.getElementById('userAvatar').textContent = username[0].toUpperCase();
     await loadUserData();
     initApp();
   } else {
@@ -968,12 +929,19 @@ auth.onAuthStateChanged(async (user) => {
     clearTimers();
   }
 });
-// ==================== Firestore 数据操作 ====================
+// ==================== Supabase 数据操作 ====================
 async function loadUserData() {
   try {
-    const doc = await db.collection('users').doc(currentUser.uid).get();
-    if(doc.exists) {
-      const raw = doc.data();
+    const { data, error } = await supabase
+      .from('users_data')
+      .select('data')
+      .eq('user_id', currentUser.id)
+      .single();
+    
+    if (error && error.code !== 'PGRST116') throw error;
+    
+    if (data && data.data) {
+      const raw = data.data;
       userData = getDefaultUserData();
       // 合并已有数据，保留新字段的默认值
       if(raw.settings) {
@@ -986,13 +954,16 @@ async function loadUserData() {
       if(raw.interviewReviews) userData.interviewReviews = raw.interviewReviews;
       if(raw.carryOverTasks) userData.carryOverTasks = raw.carryOverTasks;
       if(raw.customReminders) userData.settings.customReminders = raw.customReminders;
-      // 迁移旧字段 examRemindDays -> examRemindAdvance
-      if(raw.settings && raw.settings.examRemindDays && !raw.settings.examRemindAdvance) {
-        userData.settings.examRemindAdvance = raw.settings.examRemindDays * 24;
-      }
     } else {
       userData = getDefaultUserData();
-      await db.collection('users').doc(currentUser.uid).set(userData);
+      // 创建新数据
+      const { error: insertError } = await supabase
+        .from('users_data')
+        .insert([{
+          user_id: currentUser.id,
+          data: userData
+        }]);
+      if (insertError) throw insertError;
     }
   } catch(err) {
     console.error('Load data error:', err);
@@ -1003,7 +974,16 @@ async function loadUserData() {
 async function saveAllData() {
   if(!currentUser || !userData) return;
   try {
-    await db.collection('users').doc(currentUser.uid).set(userData);
+    const { error } = await supabase
+      .from('users_data')
+      .upsert({
+        user_id: currentUser.id,
+        data: userData
+      }, {
+        onConflict: 'user_id'
+      });
+    
+    if (error) throw error;
   } catch(err) {
     console.error('Save error:', err);
     showToast('数据保存失败，请检查网络', 'error');
