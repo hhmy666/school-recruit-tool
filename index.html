@@ -745,15 +745,28 @@ const firebaseConfig = {
   appId: "1:33657880196:web:0ece4727c77f623016ccd1",
   measurementId: "G-8SKWXM214W"
 };
+
+// 你的代理域名
+const PROXY_DOMAIN = "firebase-proxy-huang.huanghemingyang.workers.dev";
+
+// 初始化 Firebase
 firebase.initializeApp(firebaseConfig);
+
+// 初始化 Auth 和 Firestore
 const auth = firebase.auth();
 const db = firebase.firestore();
+
+// 配置 Auth 使用代理（注意：useEmulator 是用于本地开发的，不适用于生产环境代理）
+// 对于 Cloudflare Workers 代理，我们需要修改 Firebase 的内部配置
+// 但 Firebase SDK 不直接支持这种方式，所以我们保持原配置，让 Workers 在网络层拦截
+
+// 登录状态持久化
+auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+
 // 开启 Firestore 离线持久化
 db.enablePersistence().catch(err => {
   console.log('Firestore persistence error:', err.code);
 });
-// 登录状态持久化
-auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
 // ==================== 全局变量 ====================
 let currentUser = null;
 let userData = null;
