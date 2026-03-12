@@ -749,16 +749,51 @@ const firebaseConfig = {
 // 你的代理域名
 const PROXY_DOMAIN = "firebase-proxy-huang.huanghemingyang.workers.dev";
 
+// ==================== 拦截 fetch 请求，使用代理 ====================
+const originalFetch = window.fetch;
+window.fetch = function(url, options) {
+  // 如果是字符串 URL
+  if (typeof url === 'string') {
+    // 拦截 Firebase Auth 请求
+    if (url.includes('identitytoolkit.googleapis.com')) {
+      url = url.replace('identitytoolkit.googleapis.com', PROXY_DOMAIN);
+      console.log('[代理] Auth 请求:', url);
+    }
+    // 拦截 Firebase Firestore 请求
+    else if (url.includes('firestore.googleapis.com')) {
+      url = url.replace('firestore.googleapis.com', PROXY_DOMAIN);
+      console.log('[代理] Firestore 请求:', url);
+    }
+    // 拦截 securetoken 请求
+    else if (url.includes('securetoken.googleapis.com')) {
+      url = url.replace('securetoken.googleapis.com', PROXY_DOMAIN);
+      console.log('[代理] Token 请求:', url);
+    }
+  }
+  // 如果是 Request 对象
+  else if (url instanceof Request) {
+    const originalUrl = url.url;
+    if (originalUrl.includes('identitytoolkit.googleapis.com') || 
+        originalUrl.includes('firestore.googleapis.com') ||
+        originalUrl.includes('securetoken.googleapis.com')) {
+      const newUrl = originalUrl
+        .replace('identitytoolkit.googleapis.com', PROXY_DOMAIN)
+        .replace('firestore.googleapis.com', PROXY_DOMAIN)
+        .replace('securetoken.googleapis.com', PROXY_DOMAIN);
+      console.log('[代理] 请求:', newUrl);
+      url = new Request(newUrl, url);
+    }
+  }
+  
+  return originalFetch(url, options);
+};
+
 // 初始化 Firebase
 firebase.initializeApp(firebaseConfig);
 
 // 初始化 Auth 和 Firestore
 const auth = firebase.auth();
 const db = firebase.firestore();
-
-// 配置 Auth 使用代理（注意：useEmulator 是用于本地开发的，不适用于生产环境代理）
-// 对于 Cloudflare Workers 代理，我们需要修改 Firebase 的内部配置
-// 但 Firebase SDK 不直接支持这种方式，所以我们保持原配置，让 Workers 在网络层拦截
 
 // 登录状态持久化
 auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
