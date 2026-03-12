@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>校招管家 - 校园招聘管理工具</title>
+<title>校招管家 - 校园招聘管理工具 v2.0</title>
 <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/remixicon@4.1.0/fonts/remixicon.css" rel="stylesheet">
@@ -731,14 +731,21 @@ body { font-family:'Inter',system-ui,-apple-system,sans-serif; background:#F0F2F
   </div>
 </div>
 <!-- Supabase SDK -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.js"></script>
 <script>
 // ==================== Supabase 初始化 ====================
 const SUPABASE_URL = 'https://pyiwlrpkfzjtnfgccexm.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB5aXdscnBrZnpqdG5mZ2NjZXhtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyODk4MTAsImV4cCI6MjA4ODg2NTgxMH0.pDoPoHellXa3Y67YDH8uE_cwKwpS7-l4pg0xZLe0OrQ';
 
-// 初始化 Supabase 客户端
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// 等待 Supabase SDK 加载完成
+let supabase;
+if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
+  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  console.log('[Supabase] SDK 加载成功');
+} else {
+  console.error('[Supabase] SDK 加载失败，请刷新页面');
+  alert('系统初始化失败，请刷新页面重试');
+}
 // ==================== 全局变量 ====================
 let currentUser = null;
 let userData = null;
@@ -885,19 +892,28 @@ async function handleLogin() {
   btn.disabled = true;
   btn.innerHTML = '<span class="loading-spinner"></span> 登录中...';
   try {
+    console.log('[Supabase] 尝试登录:', email);
     // Supabase 登录
     const { data, error } = await supabase.auth.signInWithPassword({
       email: email,
       password: password
     });
+    
+    console.log('[Supabase] 登录结果:', { data, error });
+    
     if (error) throw error;
-    showToast('登录成功！', 'success');
+    
+    if (data && data.user) {
+      console.log('[Supabase] 登录成功，用户ID:', data.user.id);
+      showToast('登录成功！', 'success');
+    }
   } catch(err) {
-    console.error('登录错误:', err);
+    console.error('[Supabase] 登录错误:', err);
     const msgs = {
       'Invalid login credentials': '邮箱或密码错误',
-      'Email not confirmed': '请先验证邮箱',
-      'Invalid email': '邮箱格式不正确'
+      'Email not confirmed': '邮箱未验证，请查收验证邮件或联系管理员关闭邮箱验证',
+      'Invalid email': '邮箱格式不正确',
+      'User not found': '用户不存在'
     };
     showAuthError(msgs[err.message] || err.message || '登录失败');
   }
@@ -932,15 +948,24 @@ supabase.auth.onAuthStateChange(async (event, session) => {
 // ==================== Supabase 数据操作 ====================
 async function loadUserData() {
   try {
+    console.log('[Supabase] 开始加载用户数据，用户ID:', currentUser.id);
+    
     const { data, error } = await supabase
       .from('users_data')
       .select('data')
       .eq('user_id', currentUser.id)
       .single();
     
-    if (error && error.code !== 'PGRST116') throw error;
+    console.log('[Supabase] 查询结果:', { data, error });
+    
+    // PGRST116 表示没有找到数据（新用户）
+    if (error && error.code !== 'PGRST116') {
+      console.error('[Supabase] 查询错误:', error);
+      throw error;
+    }
     
     if (data && data.data) {
+      console.log('[Supabase] 找到现有数据');
       const raw = data.data;
       userData = getDefaultUserData();
       // 合并已有数据，保留新字段的默认值
@@ -954,7 +979,9 @@ async function loadUserData() {
       if(raw.interviewReviews) userData.interviewReviews = raw.interviewReviews;
       if(raw.carryOverTasks) userData.carryOverTasks = raw.carryOverTasks;
       if(raw.customReminders) userData.settings.customReminders = raw.customReminders;
+      showToast('数据加载成功', 'success');
     } else {
+      console.log('[Supabase] 新用户，创建默认数据');
       userData = getDefaultUserData();
       // 创建新数据
       const { error: insertError } = await supabase
@@ -963,12 +990,18 @@ async function loadUserData() {
           user_id: currentUser.id,
           data: userData
         }]);
-      if (insertError) throw insertError;
+      
+      if (insertError) {
+        console.error('[Supabase] 插入数据错误:', insertError);
+        throw insertError;
+      }
+      console.log('[Supabase] 默认数据创建成功');
+      showToast('欢迎使用！已创建默认数据', 'success');
     }
   } catch(err) {
-    console.error('Load data error:', err);
+    console.error('[Supabase] 加载数据失败:', err);
     userData = getDefaultUserData();
-    showToast('数据加载失败，使用默认数据', 'warning');
+    showToast('数据加载失败：' + (err.message || '未知错误'), 'error');
   }
 }
 async function saveAllData() {
