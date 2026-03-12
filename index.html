@@ -97,7 +97,9 @@ body { font-family:'Inter',system-ui,-apple-system,sans-serif; background:#F0F2F
 .checkin-btn:disabled { opacity:.5; cursor:not-allowed; transform:none; box-shadow:none; }
 .calendar-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
 .cal-header { text-align:center; font-size:12px; font-weight:600; color:var(--gray-500); padding:8px 0; }
-.cal-day { text-align:center; padding:8px 4px; border-radius:8px; font-size:13px; cursor:default; position:relative; }
+.cal-day { text-align:center; padding:8px 4px; border-radius:8px; font-size:13px; cursor:pointer; position:relative; transition:.15s; }
+.cal-day:hover:not(.empty):not(.rest) { background:var(--gray-100); }
+.cal-day.checked:hover, .cal-day.makeup:hover { opacity:.85; }
 .cal-day.today { font-weight:700; }
 .cal-day.checked { background:#D1FAE5; color:#065F46; font-weight:600; }
 .cal-day.missed { background:var(--gray-100); color:var(--gray-400); }
@@ -476,10 +478,6 @@ body { font-family:'Inter',system-ui,-apple-system,sans-serif; background:#F0F2F
                 <option value="72">提前 72 小时</option>
               </select>
             </div>
-            <div class="setting-row">
-              <div class="setting-label">提醒时间</div>
-              <input type="time" class="form-input" style="width:130px;" id="examReminderTime" value="09:00" onchange="saveReminderSettings()">
-            </div>
           </div>
           <!-- 自定义提醒 -->
           <div class="reminder-settings-group">
@@ -492,8 +490,12 @@ body { font-family:'Inter',system-ui,-apple-system,sans-serif; background:#F0F2F
                 <input type="text" class="form-input" id="newCRName" placeholder="如：网申截止" style="font-size:13px;">
               </div>
               <div>
+                <label style="font-size:12px;color:var(--gray-500);display:block;margin-bottom:4px;">提醒日期</label>
+                <input type="date" class="form-input" id="newCRDate" style="font-size:13px;">
+              </div>
+              <div>
                 <label style="font-size:12px;color:var(--gray-500);display:block;margin-bottom:4px;">提醒时间</label>
-                <input type="datetime-local" class="form-input" id="newCRTime" style="font-size:13px;">
+                <input type="time" class="form-input" id="newCRTimeOnly" value="09:00" style="font-size:13px;width:100px;">
               </div>
               <button class="btn btn-sm btn-primary" style="width:auto;height:38px;" onclick="addCustomReminder()">
                 <i class="ri-add-line"></i> 添加
@@ -669,6 +671,52 @@ body { font-family:'Inter',system-ui,-apple-system,sans-serif; background:#F0F2F
       <button class="btn btn-primary" style="flex:1;" onclick="saveEditApp()">💾 保存</button>
       <button class="btn btn-outline" onclick="closeModal('editAppModal')">取消</button>
     </div>
+  </div>
+</div>
+<!-- 补打卡弹窗 -->
+<div class="modal-overlay" id="makeupCheckinModal">
+  <div class="modal" style="max-width:500px;">
+    <h3 id="makeupModalTitle">补打卡</h3>
+    <input type="hidden" id="makeupDate">
+    <div class="form-group">
+      <label>投递公司数量</label>
+      <div class="task-counter" style="justify-content:flex-start;">
+        <button class="counter-btn" onclick="changeMakeupDeliveryCount(-1)">−</button>
+        <span class="counter-value" id="makeupDeliveryCount">5</span>
+        <button class="counter-btn" onclick="changeMakeupDeliveryCount(1)">+</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>投递公司</label>
+      <div id="makeupDeliveryInputs"></div>
+    </div>
+    <div class="form-group">
+      <label>沉淀内容</label>
+      <div id="makeupSettleCheckboxes"></div>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-primary" style="flex:1;" onclick="saveMakeupCheckin()">💾 保存补打卡</button>
+      <button class="btn btn-outline" onclick="closeModal('makeupCheckinModal')">取消</button>
+    </div>
+  </div>
+</div>
+<!-- 打卡详情弹窗 -->
+<div class="modal-overlay" id="checkinDetailModal">
+  <div class="modal" style="max-width:500px;">
+    <h3 id="detailModalTitle">打卡详情</h3>
+    <div class="form-group">
+      <label>打卡时间</label>
+      <div id="checkinDetailTime" style="font-size:14px;color:var(--gray-700);padding:8px 0;"></div>
+    </div>
+    <div class="form-group">
+      <label>投递公司 (<span id="checkinDetailDeliveryCount">0</span> 家)</label>
+      <div id="checkinDetailCompanies" style="font-size:13px;color:var(--gray-700);"></div>
+    </div>
+    <div class="form-group">
+      <label>沉淀内容 (<span id="checkinDetailSettleCount">0</span> 项)</label>
+      <div id="checkinDetailSettles" style="font-size:13px;color:var(--gray-700);"></div>
+    </div>
+    <button class="btn btn-outline" style="width:100%;" onclick="closeModal('checkinDetailModal')">关闭</button>
   </div>
 </div>
 <!-- Firebase SDKs -->
@@ -1147,6 +1195,7 @@ function renderCalendar() {
     const isRest = userData.settings.restDays.includes(dow);
     let cls = 'cal-day';
     let label = d;
+    let onclick = '';
     if(isToday) cls += ' today';
     if(isRest) {
       cls += ' rest';
@@ -1154,10 +1203,12 @@ function renderCalendar() {
     } else if(checkin?.done) {
       if(checkin.makeup) cls += ' makeup';
       else cls += ' checked';
+      onclick = `onclick="showCheckinDetail('${dateStr}')"`;
     } else if(dateStr < today && !isRest) {
       cls += ' missed';
+      onclick = `onclick="openMakeupCheckin('${dateStr}')"`;
     }
-    html += `<div class="${cls}">${label}</div>`;
+    html += `<div class="${cls}" ${onclick}>${label}</div>`;
   }
   document.getElementById('calendarGrid').innerHTML = html;
 }
@@ -1436,7 +1487,6 @@ function renderSettings() {
   // 笔试截止提醒
   document.getElementById('toggleExamReminder').className = 'toggle' + (s.examReminderEnabled !== false ? ' on' : '');
   document.getElementById('examRemindAdvance').value = s.examRemindAdvance || 24;
-  document.getElementById('examReminderTime').value = s.examReminderTime || '09:00';
   // 自定义提醒
   renderCustomReminders();
   // 沉淀选项
@@ -1473,15 +1523,19 @@ function renderCustomReminders() {
 }
 async function addCustomReminder() {
   const name = document.getElementById('newCRName').value.trim();
-  const time = document.getElementById('newCRTime').value;
+  const date = document.getElementById('newCRDate').value;
+  const timeOnly = document.getElementById('newCRTimeOnly').value;
   if(!name) return showToast('请输入事件名称', 'warning');
-  if(!time) return showToast('请选择提醒时间', 'warning');
+  if(!date) return showToast('请选择提醒日期', 'warning');
+  if(!timeOnly) return showToast('请选择提醒时间', 'warning');
+  const time = `${date}T${timeOnly}`;
   if(!userData.settings.customReminders) userData.settings.customReminders = [];
   userData.settings.customReminders.push({ name, time, notified: false });
   // 按时间排序
   userData.settings.customReminders.sort((a,b) => new Date(a.time) - new Date(b.time));
   document.getElementById('newCRName').value = '';
-  document.getElementById('newCRTime').value = '';
+  document.getElementById('newCRDate').value = '';
+  document.getElementById('newCRTimeOnly').value = '09:00';
   await saveAllData();
   renderCustomReminders();
   showToast('自定义提醒已添加', 'success');
@@ -1579,7 +1633,6 @@ async function toggleReminderDay(day) {
 async function saveReminderSettings() {
   userData.settings.reminderTime = document.getElementById('reminderTime').value;
   userData.settings.examRemindAdvance = parseInt(document.getElementById('examRemindAdvance').value) || 24;
-  userData.settings.examReminderTime = document.getElementById('examReminderTime').value;
   await saveAllData();
   setupReminders();
   showToast('提醒设置已保存', 'success');
@@ -1587,7 +1640,6 @@ async function saveReminderSettings() {
 async function saveSettings() {
   userData.settings.reminderTime = document.getElementById('reminderTime').value;
   userData.settings.examRemindAdvance = parseInt(document.getElementById('examRemindAdvance').value) || 24;
-  userData.settings.examReminderTime = document.getElementById('examReminderTime').value;
   userData.settings.templates = {
     slogan: document.getElementById('tplSlogan').value,
     motivation: document.getElementById('tplMotivation').value,
@@ -1639,9 +1691,6 @@ function checkDailyReminder() {
 function checkExamReminder() {
   if(!userData || userData.settings.examReminderEnabled === false) return;
   const now = new Date(new Date().toLocaleString('en-US', {timeZone:'Asia/Shanghai'}));
-  const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-  const targetTime = userData.settings.examReminderTime || '09:00';
-  if(timeStr !== targetTime) return;
   const advanceHours = userData.settings.examRemindAdvance || 24;
   const nowMs = now.getTime();
   userData.applications.forEach(app => {
@@ -1725,6 +1774,170 @@ async function clearAllData() {
   await saveAllData();
   initApp();
   showToast('数据已清空', 'info');
+}
+// ==================== 补打卡功能 ====================
+let makeupDeliveryCount = 5;
+function openMakeupCheckin(dateStr) {
+  const checkin = userData.checkins[dateStr];
+  if(checkin?.done) return;
+  document.getElementById('makeupDate').value = dateStr;
+  const dt = new Date(dateStr);
+  const dayNames = ['周日','周一','周二','周三','周四','周五','周六'];
+  document.getElementById('makeupModalTitle').textContent = 
+    `补打卡 - ${dt.getFullYear()}年${dt.getMonth()+1}月${dt.getDate()}日 ${dayNames[dt.getDay()]}`;
+  makeupDeliveryCount = checkin?.deliveryCount || userData.settings.defaultDelivery || 5;
+  document.getElementById('makeupDeliveryCount').textContent = makeupDeliveryCount;
+  renderMakeupDeliveryInputs(dateStr);
+  renderMakeupSettleCheckboxes(dateStr);
+  openModal('makeupCheckinModal');
+}
+function changeMakeupDeliveryCount(delta) {
+  makeupDeliveryCount += delta;
+  if(makeupDeliveryCount < 1) makeupDeliveryCount = 1;
+  if(makeupDeliveryCount > 30) makeupDeliveryCount = 30;
+  document.getElementById('makeupDeliveryCount').textContent = makeupDeliveryCount;
+  const dateStr = document.getElementById('makeupDate').value;
+  renderMakeupDeliveryInputs(dateStr);
+}
+function renderMakeupDeliveryInputs(dateStr) {
+  const checkin = userData.checkins[dateStr];
+  const companies = checkin?.companies || [];
+  let html = '';
+  for(let i = 0; i < makeupDeliveryCount; i++) {
+    const comp = companies[i] || {};
+    html += `<div class="company-input-row" style="margin-bottom:6px;">
+      <span style="font-size:12px;color:var(--gray-400);min-width:24px;">${i+1}.</span>
+      <input type="text" class="form-input" placeholder="公司名称"
+        value="${escHtml(comp.company||'')}" id="makeupCompany${i}" style="font-size:13px;">
+      <input type="text" class="form-input" placeholder="岗位（选填）" style="max-width:120px;font-size:13px;"
+        value="${escHtml(comp.position||'')}" id="makeupPosition${i}">
+    </div>`;
+  }
+  document.getElementById('makeupDeliveryInputs').innerHTML = html;
+}
+function renderMakeupSettleCheckboxes(dateStr) {
+  const checkin = userData.checkins[dateStr];
+  const selectedSettles = checkin?.settles || [];
+  const customText = checkin?.customSettleText || '';
+  const options = userData.settings.settleOptions;
+  let html = '';
+  options.forEach((opt, i) => {
+    const checked = selectedSettles.includes(opt);
+    html += `<label class="settle-option">
+      <input type="checkbox" ${checked?'checked':''} id="makeupSettle${i}">
+      <span>${escHtml(opt)}</span>
+    </label>`;
+  });
+  const customChecked = selectedSettles.includes('__custom__');
+  html += `<label class="settle-option ${customChecked?'custom-active':''}">
+    <input type="checkbox" ${customChecked?'checked':''} id="makeupSettleCustom" onchange="toggleMakeupCustomSettle()">
+    <span>自定义</span>
+  </label>`;
+  html += `<div id="makeupCustomSettleInput" style="display:${customChecked?'block':'none'};margin-left:28px;margin-top:4px;">
+    <input type="text" class="form-input" style="font-size:13px;" placeholder="请输入自定义沉淀内容..."
+      value="${escHtml(customText)}" id="makeupCustomSettleText">
+  </div>`;
+  document.getElementById('makeupSettleCheckboxes').innerHTML = html;
+}
+function toggleMakeupCustomSettle() {
+  const checked = document.getElementById('makeupSettleCustom').checked;
+  document.getElementById('makeupCustomSettleInput').style.display = checked ? 'block' : 'none';
+}
+async function saveMakeupCheckin() {
+  const dateStr = document.getElementById('makeupDate').value;
+  const companies = [];
+  for(let i = 0; i < makeupDeliveryCount; i++) {
+    const company = document.getElementById(`makeupCompany${i}`).value.trim();
+    const position = document.getElementById(`makeupPosition${i}`).value.trim();
+    if(company) companies.push({ company, position });
+  }
+  const settles = [];
+  const options = userData.settings.settleOptions;
+  options.forEach((opt, i) => {
+    if(document.getElementById(`makeupSettle${i}`)?.checked) {
+      settles.push(opt);
+    }
+  });
+  if(document.getElementById('makeupSettleCustom')?.checked) {
+    settles.push('__custom__');
+  }
+  const customText = document.getElementById('makeupCustomSettleText')?.value.trim() || '';
+  userData.checkins[dateStr] = {
+    companies,
+    settles,
+    customSettleText: customText,
+    done: true,
+    makeup: true,
+    time: new Date().toISOString(),
+    deliveryCount: makeupDeliveryCount
+  };
+  // 将有效投递数据同步到投递管理
+  companies.forEach(comp => {
+    if(comp.company && comp.company.trim()) {
+      const exists = userData.applications.find(a =>
+        a.company === comp.company.trim() && a.date === dateStr
+      );
+      if(!exists) {
+        userData.applications.push({
+          id: Date.now().toString(36) + Math.random().toString(36).substr(2,5),
+          company: comp.company.trim(),
+          position: comp.position || '',
+          date: dateStr,
+          examDeadline: '',
+          interviewTime: '',
+          status: '已投递'
+        });
+      }
+    }
+  });
+  await saveAllData();
+  closeModal('makeupCheckinModal');
+  renderCalendar();
+  showToast('补打卡成功！', 'success');
+}
+// ==================== 打卡详情查看 ====================
+function showCheckinDetail(dateStr) {
+  const checkin = userData.checkins[dateStr];
+  if(!checkin || !checkin.done) return;
+  const dt = new Date(dateStr);
+  const dayNames = ['周日','周一','周二','周三','周四','周五','周六'];
+  document.getElementById('detailModalTitle').textContent = 
+    `打卡详情 - ${dt.getFullYear()}年${dt.getMonth()+1}月${dt.getDate()}日 ${dayNames[dt.getDay()]}`;
+  const checkinTime = new Date(checkin.time);
+  const timeStr = `${checkinTime.getFullYear()}-${String(checkinTime.getMonth()+1).padStart(2,'0')}-${String(checkinTime.getDate()).padStart(2,'0')} ${String(checkinTime.getHours()).padStart(2,'0')}:${String(checkinTime.getMinutes()).padStart(2,'0')}:${String(checkinTime.getSeconds()).padStart(2,'0')}`;
+  document.getElementById('checkinDetailTime').innerHTML = 
+    `${timeStr}${checkin.makeup ? ' <span style="color:var(--warning);font-weight:600;">(补打卡)</span>' : ''}`;
+  const companies = checkin.companies || [];
+  const validCompanies = companies.filter(c => c.company && c.company.trim());
+  document.getElementById('checkinDetailDeliveryCount').textContent = validCompanies.length;
+  if(validCompanies.length > 0) {
+    document.getElementById('checkinDetailCompanies').innerHTML = validCompanies.map((c, i) => 
+      `<div style="padding:6px 0;border-bottom:1px solid var(--gray-100);">
+        ${i+1}. <strong>${escHtml(c.company)}</strong>${c.position ? ` - ${escHtml(c.position)}` : ''}
+      </div>`
+    ).join('');
+  } else {
+    document.getElementById('checkinDetailCompanies').innerHTML = 
+      '<div style="padding:6px 0;color:var(--gray-400);">未填写投递公司</div>';
+  }
+  const settles = checkin.settles || [];
+  document.getElementById('checkinDetailSettleCount').textContent = settles.length;
+  if(settles.length > 0) {
+    document.getElementById('checkinDetailSettles').innerHTML = settles.map((s, i) => {
+      if(s === '__custom__') {
+        return `<div style="padding:6px 0;border-bottom:1px solid var(--gray-100);">
+          ${i+1}. 自定义：${escHtml(checkin.customSettleText || '(未填写)')}
+        </div>`;
+      }
+      return `<div style="padding:6px 0;border-bottom:1px solid var(--gray-100);">
+        ${i+1}. ${escHtml(s)}
+      </div>`;
+    }).join('');
+  } else {
+    document.getElementById('checkinDetailSettles').innerHTML = 
+      '<div style="padding:6px 0;color:var(--gray-400);">未选择沉淀内容</div>';
+  }
+  openModal('checkinDetailModal');
 }
 // Enter key for auth
 document.addEventListener('keydown', e => {
